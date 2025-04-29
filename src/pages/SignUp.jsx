@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,8 +13,15 @@ const SignUp = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { signUp } = useAuth();
+  const { user, signUp } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,16 +57,13 @@ const SignUp = () => {
         last_name: lastName,
         role: role,
         roll_number: role === 'student' ? rollNumber : null,
+        department: null, // Add default value for department
       };
       
       // Sign up the user
-      await signUp(email, password, {
-        role: role,
-        first_name: firstName,
-        last_name: lastName,
-      });
+      await signUp(email, password, userProfile);
       
-      // Redirect to login
+      // Redirect to login with success message
       navigate('/login', { 
         state: { message: 'Account created successfully. Please sign in.' } 
       });
@@ -75,7 +79,7 @@ const SignUp = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/" className="flex justify-center text-3xl font-bold text-primary-500 mb-6">
-          <span className="text-3xl mr-2">⏱️</span> Attendo
+          <span className="text-3xl mr-2">⏱</span> Attendo
         </Link>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Create your account
@@ -108,7 +112,7 @@ const SignUp = () => {
             
             <div className="flex space-x-4">
               <div className="w-1/2">
-                <label htmlFor="firstName" className="label">
+                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
                   First name
                 </label>
                 <input
@@ -118,12 +122,12 @@ const SignUp = () => {
                   required
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="input"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
               
               <div className="w-1/2">
-                <label htmlFor="lastName" className="label">
+                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
                   Last name
                 </label>
                 <input
@@ -133,13 +137,13 @@ const SignUp = () => {
                   required
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="input"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="email" className="label">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
               </label>
               <input
@@ -150,12 +154,12 @@ const SignUp = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
 
             <div>
-              <label htmlFor="role" className="label">
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
                 I am a:
               </label>
               <div className="flex space-x-4 mt-1">
@@ -192,7 +196,7 @@ const SignUp = () => {
 
             {role === 'student' && (
               <div>
-                <label htmlFor="rollNumber" className="label">
+                <label htmlFor="rollNumber" className="block text-sm font-medium text-gray-700">
                   Roll Number
                 </label>
                 <input
@@ -202,13 +206,13 @@ const SignUp = () => {
                   required
                   value={rollNumber}
                   onChange={(e) => setRollNumber(e.target.value)}
-                  className="input"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
             )}
 
             <div>
-              <label htmlFor="password" className="label">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
               <input
@@ -219,12 +223,12 @@ const SignUp = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="input"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="label">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
                 Confirm Password
               </label>
               <input
@@ -235,7 +239,7 @@ const SignUp = () => {
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="input"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
 
@@ -243,7 +247,7 @@ const SignUp = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full btn btn-primary py-2"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
               >
                 {isLoading ? 'Creating account...' : 'Create Account'}
               </button>

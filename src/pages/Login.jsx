@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
@@ -8,11 +8,36 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const { signIn, isStudent, isTeacher } = useAuth();
+  const { user, signIn, isStudent, isTeacher } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Check if user is already logged in and redirect accordingly
+  useEffect(() => {
+    if (user) {
+      if (isTeacher) {
+        navigate('/teacher/dashboard');
+      } else if (isStudent) {
+        navigate('/student/dashboard');
+      }
+    }
+  }, [user, isStudent, isTeacher, navigate]);
+  
+  // Display any messages passed in location state
+  useEffect(() => {
+    if (location.state?.message) {
+      // Display success message if coming from signup
+      setError('');
+    }
+  }, [location.state]);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      setError('Please enter both email and password');
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -20,26 +45,14 @@ const Login = () => {
       
       const result = await signIn(email, password);
       console.log('Sign in result:', result);
-      console.log('Profile data:', result.profile);
-      console.log('Role from profile:', result.profile?.role);
       
-      // Add a small delay to ensure context updates with the new profile
-      setTimeout(() => {
-        // Check current auth context values after profile is set
-        console.log('Auth context after login - isStudent:', isStudent, 'isTeacher:', isTeacher);
-        
-        if (result.profile?.role === 'teacher') {
-          console.log('Redirecting to teacher dashboard');
-          navigate('/teacher/dashboard');
-        } else if (result.profile?.role === 'student') {
-          console.log('Redirecting to student dashboard');
-          navigate('/student/dashboard');
-        } else {
-          console.error('Unknown user role:', result.profile?.role);
-          setError('Login successful but role not recognized');
-        }
-      }, 100);
-      
+      if (result.profile?.role === 'teacher') {
+        navigate('/teacher/dashboard');
+      } else if (result.profile?.role === 'student') {
+        navigate('/student/dashboard');
+      } else {
+        setError('Login successful but role not recognized');
+      }
     } catch (error) {
       console.error('Login error:', error);
       setError(error.message || 'Failed to sign in');
@@ -52,6 +65,12 @@ const Login = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Login</h2>
+        
+        {location.state?.message && (
+          <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
+            <p className="text-sm text-green-700">{location.state.message}</p>
+          </div>
+        )}
         
         {error && (
           <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">

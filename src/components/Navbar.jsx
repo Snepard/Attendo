@@ -1,9 +1,10 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
-  const { user, profile, isStudent, isTeacher } = useAuth();
+  const { user, profile, isStudent, isTeacher, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Don't show navbar on landing page
   if (location.pathname === '/') {
@@ -15,12 +16,21 @@ const Navbar = () => {
     return null;
   }
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
   return (
     <nav className="bg-white shadow-md">
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center">
-          <Link to="/" className="text-xl font-bold text-primary-500 flex items-center">
-            <span className="text-2xl mr-2">⏱️</span> Attendo
+          <Link to={user ? (isStudent ? '/student/dashboard' : '/teacher/dashboard') : '/'} className="text-xl font-bold text-primary-500 flex items-center">
+            <span className="text-2xl mr-2">⏱</span> Attendo
           </Link>
 
           {user ? (
@@ -75,10 +85,16 @@ const Navbar = () => {
                 </>
               )}
               
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-4">
                 <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-semibold text-sm">
                   {profile?.first_name?.[0] || user.email[0].toUpperCase()}
                 </div>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm font-medium text-gray-700 hover:text-primary-500 transition"
+                >
+                  Logout
+                </button>
               </div>
             </div>
           ) : (
@@ -97,4 +113,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar;
+export default Navbar;  

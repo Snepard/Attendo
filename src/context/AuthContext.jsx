@@ -106,6 +106,7 @@ export function AuthProvider({ children }) {
   const signUp = async (email, password, userProfile) => {
     try {
       console.log('Signing up with role:', userProfile.role);
+      setLoading(true);
       
       // Create auth user
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -152,6 +153,8 @@ export function AuthProvider({ children }) {
     } catch (error) {
       setError(error.message);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -159,6 +162,7 @@ export function AuthProvider({ children }) {
   const signIn = async (email, password) => {
     try {
       console.log('Signing in with email:', email);
+      setLoading(true);
       
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -193,6 +197,39 @@ export function AuthProvider({ children }) {
       console.error('Sign in process failed:', error);
       setError(error.message);
       throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sign out function
+  const signOut = async () => {
+    try {
+      setLoading(true);
+      console.log('Signing out user');
+      
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Sign out error:', error);
+        throw error;
+      }
+      
+      // Clear user and profile state
+      setUser(null);
+      setProfile(null);
+      setIsStudent(false);
+      setIsTeacher(false);
+      
+      console.log('User signed out successfully');
+      
+      return true;
+    } catch (error) {
+      console.error('Sign out process failed:', error);
+      setError(error.message);
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -235,6 +272,7 @@ export function AuthProvider({ children }) {
     error,
     signUp,
     signIn,
+    signOut,  // Added signOut function to the context
     updateProfile,
     isStudent,
     isTeacher,

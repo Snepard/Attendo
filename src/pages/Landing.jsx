@@ -1,6 +1,17 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Landing = () => {
+  const { user, isStudent, isTeacher } = useAuth();
+  
+  // Determine dashboard URL based on user role
+  const getDashboardUrl = () => {
+    if (!user) return '/login';
+    if (isTeacher) return '/teacher/dashboard';
+    if (isStudent) return '/student/dashboard';
+    return '/login';
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Hero Section */}
@@ -8,15 +19,23 @@ const Landing = () => {
         <div className="container mx-auto px-4 py-16">
           <nav className="flex justify-between items-center mb-16">
             <div className="text-2xl font-bold flex items-center">
-              <span className="text-3xl mr-2">⏱️</span> Attendo
+              <span className="text-3xl mr-2">⏱</span> Attendo
             </div>
             <div className="flex space-x-4">
-              <Link to="/login" className="btn bg-white text-primary-600 hover:bg-gray-100">
-                Log In
-              </Link>
-              <Link to="/signup" className="btn bg-primary-500 text-white border border-primary-400 hover:bg-primary-600">
-                Sign Up
-              </Link>
+              {user ? (
+                <Link to={getDashboardUrl()} className="btn bg-white text-primary-600 hover:bg-gray-100">
+                  Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link to="/login" className="btn bg-white text-primary-600 hover:bg-gray-100">
+                    Log In
+                  </Link>
+                  <Link to="/signup" className="btn bg-primary-500 text-white border border-primary-400 hover:bg-primary-600">
+                    Sign Up
+                  </Link>
+                </>
+              )}
             </div>
           </nav>
           
@@ -29,9 +48,15 @@ const Landing = () => {
                 Secure, transparent, and tamper-proof attendance system powered by blockchain technology.
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 animate-[fadeIn_1.2s_ease-in]">
-                <Link to="/signup" className="btn btn-accent text-white font-semibold text-lg px-8 py-3">
-                  Get Started
-                </Link>
+                {user ? (
+                  <Link to={getDashboardUrl()} className="btn btn-accent text-white font-semibold text-lg px-8 py-3">
+                    Go to Dashboard
+                  </Link>
+                ) : (
+                  <Link to="/signup" className="btn btn-accent text-white font-semibold text-lg px-8 py-3">
+                    Get Started
+                  </Link>
+                )}
                 <a href="#features" className="btn bg-transparent border border-white text-white hover:bg-white hover:text-primary-600 font-semibold text-lg px-8 py-3">
                   Learn More
                 </a>
@@ -144,12 +169,20 @@ const Landing = () => {
             Join thousands of educational institutions already using Attendo to streamline their attendance process.
           </p>
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <Link to="/signup" className="btn bg-white text-primary-600 hover:bg-gray-100 font-semibold text-lg px-8 py-3">
-              Create an Account
-            </Link>
-            <Link to="/login" className="btn bg-transparent border border-white text-white hover:bg-white hover:text-primary-600 font-semibold text-lg px-8 py-3">
-              Log In
-            </Link>
+            {user ? (
+              <Link to={getDashboardUrl()} className="btn bg-white text-primary-600 hover:bg-gray-100 font-semibold text-lg px-8 py-3">
+                Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link to="/signup" className="btn bg-white text-primary-600 hover:bg-gray-100 font-semibold text-lg px-8 py-3">
+                  Create an Account
+                </Link>
+                <Link to="/login" className="btn bg-transparent border border-white text-white hover:bg-white hover:text-primary-600 font-semibold text-lg px-8 py-3">
+                  Log In
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
