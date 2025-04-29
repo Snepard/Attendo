@@ -38,7 +38,12 @@ const QRCodeGenerator = ({ courseId, onCodeGenerated }) => {
       const code = generateUniqueCode();
 
       // Save to database with 5 minute expiry
-      const { data, error } = await createAttendanceCode(user.id, courseId, 5);
+      const { data, error } = await createAttendanceCode({
+        teacherId: user.id,
+        courseId,
+        code,
+        validityMinutes: 5
+      });
 
       if (error) {
         throw new Error(error.message);

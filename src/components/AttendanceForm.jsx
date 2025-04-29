@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { markAttendance, validateAttendanceCode } from '../utils/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { createAttendanceRecord } from '../utils/attendanceUtils';
+import { isWithinCampus } from '../utils/locationUtils';
 
 const AttendanceForm = ({ onAttendanceMarked }) => {
   const { user, profile } = useAuth();
@@ -9,6 +10,50 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const checkLocationAndMarkAttendance = async (codeData) => {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          if (!isWithinCampus(latitude, longitude)) {
+            reject(new Error('You must be within campus area to mark attendance'));
+            return;
+          }
+
+          try {
+            // Create attendance record
+            const attendanceData = createAttendanceRecord(
+              user.id, 
+              codeData.course_id,
+              attendanceCode,
+              codeData.id
+            );
+
+            // Record attendance
+            const { data, error } = await markAttendance(attendanceData);
+
+            if (error) {
+              throw error;
+            }
+
+            resolve(data);
+          } catch (error) {
+            reject(error);
+          }
+        },
+        (error) => {
+          reject(new Error('Please enable location access to mark attendance'));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,20 +76,8 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
         return;
       }
 
-      // Create attendance record
-      const attendanceData = createAttendanceRecord(
-        user.id, 
-        codeData.course_id,
-        attendanceCode,
-        codeData.id
-      );
-
-      // Record attendance
-      const { data, error } = await markAttendance(attendanceData);
-
-      if (error) {
-        throw new Error(error.message);
-      }
+      // Check location and mark attendance
+      const data = await checkLocationAndMarkAttendance(codeData);
 
       // Success
       setSuccess('Attendance marked successfully!');
@@ -54,7 +87,7 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
       if (onAttendanceMarked) onAttendanceMarked(data);
     } catch (error) {
       console.error('Error marking attendance:', error);
-      setError('Failed to mark attendance');
+      setError(error.message || 'Failed to mark attendance');
     } finally {
       setIsSubmitting(false);
     }

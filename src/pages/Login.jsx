@@ -1,41 +1,45 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [error, setError] = useState('');
+  
+  const { signIn, isStudent, isTeacher } = useAuth();
   const navigate = useNavigate();
-
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!email || !password) {
-      setError('Please fill in all fields');
-      return;
-    }
     
     try {
       setIsLoading(true);
       setError('');
       
-      const { session } = await signIn(email, password);
-
-      // Get user role from session metadata
-      const userRole = session.user.user_metadata.role;
+      const result = await signIn(email, password);
+      console.log('Sign in result:', result);
+      console.log('Profile data:', result.profile);
+      console.log('Role from profile:', result.profile?.role);
       
-      // Redirect based on role
-      if (userRole === 'student') {
-        navigate('/student/dashboard');
-      } else if (userRole === 'teacher') {
-        navigate('/teacher/dashboard');
-      } else {
-        // Default redirect
-        navigate('/student/dashboard');
-      }
+      // Add a small delay to ensure context updates with the new profile
+      setTimeout(() => {
+        // Check current auth context values after profile is set
+        console.log('Auth context after login - isStudent:', isStudent, 'isTeacher:', isTeacher);
+        
+        if (result.profile?.role === 'teacher') {
+          console.log('Redirecting to teacher dashboard');
+          navigate('/teacher/dashboard');
+        } else if (result.profile?.role === 'student') {
+          console.log('Redirecting to student dashboard');
+          navigate('/student/dashboard');
+        } else {
+          console.error('Unknown user role:', result.profile?.role);
+          setError('Login successful but role not recognized');
+        }
+      }, 100);
+      
     } catch (error) {
       console.error('Login error:', error);
       setError(error.message || 'Failed to sign in');
@@ -43,84 +47,63 @@ const Login = () => {
       setIsLoading(false);
     }
   };
-
+  
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link to="/" className="flex justify-center text-3xl font-bold text-primary-500 mb-6">
-          <span className="text-3xl mr-2">⏱️</span> Attendo
-        </Link>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in to your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Or{' '}
-          <Link to="/signup" className="font-medium text-primary-500 hover:text-primary-600">
-            create a new account
-          </Link>
-        </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {error && (
-              <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-600">{error}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div>
-              <label htmlFor="email" className="label">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="label">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input"
-              />
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full btn btn-primary py-2"
-              >
-                {isLoading ? 'Signing in...' : 'Sign in'}
-              </button>
-            </div>
-          </form>
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Login</h2>
+        
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+        
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          
+          <div className="mb-6">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+          >
+            {isLoading ? 'Signing In...' : 'Sign In'}
+          </button>
+        </form>
+        
+        <div className="mt-4 text-center">
+          <p className="text-sm text-gray-600">
+            Don't have an account?{' '}
+            <a href="/signup" className="text-primary-600 hover:text-primary-800">
+              Sign Up
+            </a>
+          </p>
         </div>
       </div>
     </div>

@@ -7,8 +7,6 @@ const TeacherDashboard = () => {
   const { user, profile } = useAuth();
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
-  const [attendanceCode, setAttendanceCode] = useState('');
-  const [codeExpiry, setCodeExpiry] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -49,15 +47,6 @@ const TeacherDashboard = () => {
     const courseId = e.target.value;
     const course = courses.find(c => c.id === courseId);
     setSelectedCourse(course);
-    // Reset code when changing course
-    setAttendanceCode('');
-    setCodeExpiry(null);
-  };
-
-  // Handle code generation
-  const handleCodeGenerated = (code, expiry) => {
-    setAttendanceCode(code);
-    setCodeExpiry(expiry);
   };
 
   return (
@@ -131,12 +120,16 @@ const TeacherDashboard = () => {
                 <div className="pt-2">
                   <div className="flex justify-between text-sm">
                     <span className="font-medium text-gray-500">Students Enrolled</span>
-                    <span className="font-medium text-gray-900">{selectedCourse.student_count || 0}</span>
+                    <span className="font-medium text-gray-900">
+                      {selectedCourse.course_students?.length || 0}
+                    </span>
                   </div>
                   <div className="mt-2 h-2 bg-gray-200 rounded-full">
                     <div
                       className="h-2 bg-primary-500 rounded-full"
-                      style={{ width: `${Math.min((selectedCourse.student_count || 0) / 50 * 100, 100)}%` }}
+                      style={{ 
+                        width: `${Math.min(((selectedCourse.course_students?.length || 0) / 50) * 100, 100)}%` 
+                      }}
                     ></div>
                   </div>
                 </div>
@@ -148,49 +141,19 @@ const TeacherDashboard = () => {
         </div>
         
         {/* Right Column - QR Code Generator */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2">
           {selectedCourse ? (
             <QRCodeGenerator 
               courseId={selectedCourse.id} 
-              onCodeGenerated={handleCodeGenerated} 
             />
           ) : (
             <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
-              </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Course Selected</h3>
               <p className="text-gray-600">
                 Please select a course to generate an attendance QR code.
               </p>
             </div>
           )}
-          
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="p-4 bg-primary-50 border-b border-primary-100">
-              <h3 className="text-lg font-semibold text-primary-800">Recent Activity</h3>
-            </div>
-            <div className="p-6">
-              {attendanceCode ? (
-                <div className="bg-green-50 border-l-4 border-green-400 p-4">
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-green-700">
-                        Attendance code <span className="font-mono font-medium">{attendanceCode}</span> generated for {selectedCourse?.name}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-gray-500 italic">No recent activity</p>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>
