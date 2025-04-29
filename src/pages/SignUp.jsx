@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,11 +13,27 @@ const SignUp = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { signUp } = useAuth();
+  const { signUp, signOut } = useAuth();
   const navigate = useNavigate();
+
+  // Ensure user is properly signed out when accessing sign up page
+  useEffect(() => {
+    const ensureSignedOut = async () => {
+      try {
+        await signOut();
+      } catch (error) {
+        console.error('Error signing out on signup page load:', error);
+      }
+    };
+    
+    ensureSignedOut();
+  }, [signOut]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Reset error state
+    setError('');
     
     // Basic validation
     if (!firstName || !lastName || !email || !password || !confirmPassword) {
@@ -42,7 +58,6 @@ const SignUp = () => {
     
     try {
       setIsLoading(true);
-      setError('');
       
       // Create user profile data
       const userProfile = {
@@ -53,11 +68,7 @@ const SignUp = () => {
       };
       
       // Sign up the user
-      await signUp(email, password, {
-        role: role,
-        first_name: firstName,
-        last_name: lastName,
-      });
+      await signUp(email, password, userProfile);
       
       // Redirect to login
       navigate('/login', { 
@@ -66,7 +77,7 @@ const SignUp = () => {
     } catch (error) {
       console.error('Signup error:', error);
       setError(error.message || 'Failed to create account');
-    } finally {
+      // Reset loading state on error
       setIsLoading(false);
     }
   };

@@ -56,6 +56,8 @@ export function AuthProvider({ children }) {
           console.log('User role from profile:', profileData?.role);
         } else {
           console.log('No active session found');
+          setUser(null);
+          setProfile(null);
         }
       } catch (error) {
         console.error('Error checking auth session:', error);
@@ -187,10 +189,39 @@ export function AuthProvider({ children }) {
       console.log('Profile data retrieved during sign in:', profileData);
       console.log('Role from profile:', profileData?.role);
       
+      // Set profile in state
       setProfile(profileData);
+      
+      // Return data for component use
       return { session: data.session, profile: profileData };
     } catch (error) {
       console.error('Sign in process failed:', error);
+      setError(error.message);
+      throw error;
+    }
+  };
+
+  // Sign out function
+  const signOut = async () => {
+    try {
+      console.log('Signing out user');
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Sign out error:', error);
+        throw error;
+      }
+      
+      // Clear user and profile state immediately
+      setUser(null);
+      setProfile(null);
+      setIsStudent(false);
+      setIsTeacher(false);
+      
+      console.log('User signed out successfully');
+      return true;
+    } catch (error) {
+      console.error('Sign out failed:', error);
       setError(error.message);
       throw error;
     }
@@ -235,6 +266,7 @@ export function AuthProvider({ children }) {
     error,
     signUp,
     signIn,
+    signOut,
     updateProfile,
     isStudent,
     isTeacher,
