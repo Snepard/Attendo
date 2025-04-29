@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
@@ -8,49 +8,26 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const { signIn, signOut, isStudent, isTeacher } = useAuth();
+  const { signIn, isStudent, isTeacher } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  
-  // Check for message from signup or redirects
-  useEffect(() => {
-    if (location.state?.message) {
-      setError('');  // Clear any existing errors
-    }
-    
-    // Don't sign out on component mount - this was causing issues
-    // The user may be coming back to login with a valid session
-  }, [location]);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!email || !password) {
-      setError('Please enter both email and password');
-      return;
-    }
     
     try {
       setIsLoading(true);
       setError('');
       
-      // First ensure we're signed out before attempting new sign in
-      await signOut();
-      
       const result = await signIn(email, password);
       console.log('Sign in result:', result);
-      
-      if (!result || !result.profile) {
-        throw new Error('Invalid login response');
-      }
-      
       console.log('Profile data:', result.profile);
       console.log('Role from profile:', result.profile?.role);
       
       // Add a small delay to ensure context updates with the new profile
-      // This was in the original code and helps prevent race conditions
       setTimeout(() => {
-        // Navigate based on role
+        // Check current auth context values after profile is set
+        console.log('Auth context after login - isStudent:', isStudent, 'isTeacher:', isTeacher);
+        
         if (result.profile?.role === 'teacher') {
           console.log('Redirecting to teacher dashboard');
           navigate('/teacher/dashboard');
@@ -60,13 +37,13 @@ const Login = () => {
         } else {
           console.error('Unknown user role:', result.profile?.role);
           setError('Login successful but role not recognized');
-          setIsLoading(false);
         }
       }, 100);
       
     } catch (error) {
       console.error('Login error:', error);
       setError(error.message || 'Failed to sign in');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -75,12 +52,6 @@ const Login = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Login</h2>
-        
-        {location.state?.message && (
-          <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
-            <p className="text-sm text-green-700">{location.state.message}</p>
-          </div>
-        )}
         
         {error && (
           <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">

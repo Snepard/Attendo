@@ -1,62 +1,96 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
-  const { user, signOut, isStudent, isTeacher } = useAuth();
-  const navigate = useNavigate();
-  
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      navigate('/');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-  
+  const { user, profile, isStudent, isTeacher } = useAuth();
+  const location = useLocation();
+
+  // Don't show navbar on landing page
+  if (location.pathname === '/') {
+    return null;
+  }
+
+  // Don't show navbar on auth pages
+  if (location.pathname === '/login' || location.pathname === '/signup') {
+    return null;
+  }
+
   return (
-    <nav className="bg-white shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            <div className="flex items-center text-xl font-bold text-primary-500">
-              <span className="text-2xl mr-2">⏱️</span> Attendo
+    <nav className="bg-white shadow-md">
+      <div className="container mx-auto px-4 py-3">
+        <div className="flex justify-between items-center">
+          <Link to="/" className="text-xl font-bold text-primary-500 flex items-center">
+            <span className="text-2xl mr-2">⏱️</span> Attendo
+          </Link>
+
+          {user ? (
+            <div className="flex items-center space-x-6">
+              {isStudent && (
+                <>
+                  <Link 
+                    to="/student/dashboard" 
+                    className={`text-sm font-medium transition hover:text-primary-500 ${
+                      location.pathname === '/student/dashboard' ? 'text-primary-500' : 'text-gray-700'
+                    }`}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link 
+                    to="/student/profile" 
+                    className={`text-sm font-medium transition hover:text-primary-500 ${
+                      location.pathname === '/student/profile' ? 'text-primary-500' : 'text-gray-700'
+                    }`}
+                  >
+                    Profile
+                  </Link>
+                </>
+              )}
+
+              {isTeacher && (
+                <>
+                  <Link 
+                    to="/teacher/dashboard" 
+                    className={`text-sm font-medium transition hover:text-primary-500 ${
+                      location.pathname === '/teacher/dashboard' ? 'text-primary-500' : 'text-gray-700'
+                    }`}
+                  >
+                    Teacher Dashboard
+                  </Link>
+                  <Link 
+                    to="/teacher/students" 
+                    className={`text-sm font-medium transition hover:text-primary-500 ${
+                      location.pathname === '/teacher/students' ? 'text-primary-500' : 'text-gray-700'
+                    }`}
+                  >
+                    Students
+                  </Link>
+                  <Link 
+                    to="/teacher/profile" 
+                    className={`text-sm font-medium transition hover:text-primary-500 ${
+                      location.pathname === '/teacher/profile' ? 'text-primary-500' : 'text-gray-700'
+                    }`}
+                  >
+                    Profile
+                  </Link>
+                </>
+              )}
+              
+              <div className="flex items-center space-x-2">
+                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-semibold text-sm">
+                  {profile?.first_name?.[0] || user.email[0].toUpperCase()}
+                </div>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex items-center">
-            {user ? (
-              <>
-                {isTeacher && (
-                  <a href="/teacher/dashboard" className="text-gray-600 hover:text-gray-900 px-3 py-2 mr-2">
-                    Dashboard
-                  </a>
-                )}
-                
-                {isStudent && (
-                  <a href="/student/dashboard" className="text-gray-600 hover:text-gray-900 px-3 py-2 mr-2">
-                    Dashboard
-                  </a>
-                )}
-                
-                <button
-                  onClick={handleLogout}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm"
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <a href="/login" className="text-gray-600 hover:text-gray-900 px-3 py-2 mr-2">
-                  Login
-                </a>
-                <a href="/signup" className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm">
-                  Sign Up
-                </a>
-              </>
-            )}
-          </div>
+          ) : (
+            <div className="flex items-center space-x-4">
+              <Link to="/login" className="btn btn-sm btn-primary">
+                Log In
+              </Link>
+              <Link to="/signup" className="btn btn-sm btn-secondary">
+                Sign Up
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </nav>
