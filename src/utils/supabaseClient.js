@@ -44,6 +44,34 @@ export const getUserProfile = async (userId) => {
   return { data, error };
 };
 
+// Course functions
+export const createCourse = async (courseData) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .insert([courseData])
+    .select();
+  return { data, error };
+};
+
+export const getTeacherCourses = async (teacherId) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .select(`
+      *,
+      course_students (
+        student_id,
+        profiles (
+          id,
+          first_name,
+          last_name,
+          roll_number
+        )
+      )
+    `)
+    .eq('teacher_id', teacherId);
+  return { data, error };
+};
+
 // Attendance functions
 export const getStudentAttendance = async (studentId) => {
   const { data, error } = await supabase
@@ -86,25 +114,6 @@ export const validateAttendanceCode = async (code) => {
     .gt('expires_at', new Date().toISOString())
     .single();
   
-  return { data, error };
-};
-
-export const getTeacherCourses = async (teacherId) => {
-  const { data, error } = await supabase
-    .from('courses')
-    .select(`
-      *,
-      course_students (
-        student_id,
-        profiles (
-          id,
-          first_name,
-          last_name,
-          roll_number
-        )
-      )
-    `)
-    .eq('teacher_id', teacherId);
   return { data, error };
 };
 
