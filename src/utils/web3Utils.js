@@ -1,17 +1,18 @@
 import { ethers } from 'ethers';
 import { supabase } from './supabaseClient';
 
-// Telos EVM Network Configuration
+// Telos EVM Testnet Network Configuration
 export const TELOS_NETWORK = {
-  chainId: '0x28',  // 40 in decimal
-  chainName: 'Telos EVM Mainnet',
+  chainId: '0x29',  // 41 in decimal
+  chainName: 'Telos EVM Testnet',
   nativeCurrency: {
     name: 'TLOS',
     symbol: 'TLOS',
     decimals: 18
   },
-  rpcUrls: ['https://mainnet.telos.net/evm'],
-  blockExplorerUrls: ['https://teloscan.io/']
+  
+  rpcUrls: ['https://rpc.testnet.telos.net'],
+  blockExplorerUrls: ['https://testnet.teloscan.io/']
 };
 
 // Check if MetaMask is available
@@ -75,9 +76,9 @@ export const connectWallet = async () => {
     const network = await provider.getNetwork();
     const chainId = network.chainId;
     
-    // Verify we're on Telos
-    if (chainId.toString() !== '40') {
-      throw new Error('Please switch to the Telos network');
+    // Verify we're on Telos Testnet
+    if (chainId.toString() !== '41') {
+      throw new Error('Please switch to the Telos Testnet network');
     }
     
     return { 
