@@ -12,8 +12,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(
   supabaseUrl || 'https://example.supabase.co',
-  supabaseAnonKey || 'placeholder'
+  supabaseAnonKey || 'placeholder',
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
 );
+
 
 // Auth functions
 export const signUp = async (email, password, userData) => {
