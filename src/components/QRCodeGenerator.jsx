@@ -3,9 +3,12 @@ import QRCode from 'react-qr-code';
 import { calculateTimeRemaining, generateUniqueCode } from '../utils/attendanceUtils';
 import { createAttendanceCode } from '../utils/supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { useWeb3 } from '../context/Web3Context';
+import { updateAttendanceCode } from '../utils/contractUtils';
 
 const QRCodeGenerator = ({ courseId, onCodeGenerated }) => {
   const { user } = useAuth();
+  const { walletAddress, provider } = useWeb3();
   const [attendanceCode, setAttendanceCode] = useState('');
   const [expiryTime, setExpiryTime] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState({ minutes: 0, seconds: 0, expired: true });
@@ -30,19 +33,29 @@ const QRCodeGenerator = ({ courseId, onCodeGenerated }) => {
   }, [expiryTime]);
 
   const generateCode = async () => {
+    if (!walletAddress) {
+      setError('Please connect your wallet to generate attendance code');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError('');
 
       // Generate a unique code
       const code = generateUniqueCode();
+      const validityMinutes = 5;
 
-      // Save to database with 5 minute expiry
+      // Update code on blockchain
+      const signer = await provider.getSigner();
+      await updateAttendanceCode(signer, code, validityMinutes);
+
+      // Save to database
       const { data, error } = await createAttendanceCode({
         teacherId: user.id,
         courseId,
         code,
-        validityMinutes: 5
+        validityMinutes
       });
 
       if (error) {
@@ -54,7 +67,7 @@ const QRCodeGenerator = ({ courseId, onCodeGenerated }) => {
       
       // Calculate expiry time (5 minutes from now)
       const expiry = new Date();
-      expiry.setMinutes(expiry.getMinutes() + 5);
+      expiry.setMinutes(expiry.getMinutes() + validityMinutes);
       setExpiryTime(expiry);
 
       // Update parent component
@@ -70,6 +83,12 @@ const QRCodeGenerator = ({ courseId, onCodeGenerated }) => {
   return (
     <div className="bg-white rounded-lg shadow-md p-6 text-center">
       <h3 className="text-lg font-semibold mb-4">Attendance QR Code</h3>
+
+      {!walletAddress && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-sm text-yellow-700 mb-4">
+          Please connect your wallet to generate attendance codes
+        </div>
+      )}
 
       {attendanceCode ? (
         <div className="space-y-4">
@@ -99,7 +118,7 @@ const QRCodeGenerator = ({ courseId, onCodeGenerated }) => {
           
           <button
             onClick={generateCode}
-            disabled={isLoading}
+            disabled={isLoading || !walletAddress}
             className="btn btn-primary w-full"
           >
             {isLoading ? 'Generating...' : 'Generate QR Code'}

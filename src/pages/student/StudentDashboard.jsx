@@ -6,6 +6,7 @@ import { Bell, Calendar, FileText, Settings, Search, Download, BarChart2, Clock,
 // Reusing existing components
 import WalletConnect from '../../components/WalletConnect';
 import AttendanceForm from '../../components/AttendanceForm';
+import BlockchainAttendance from '../../components/BlockchainAttendance';
 
 const StudentDashboard = () => {
   const { user, profile } = useAuth();
@@ -397,6 +398,9 @@ const StudentDashboard = () => {
               </div>
               <AttendanceForm onAttendanceMarked={handleAttendanceMarked} />
             </div>
+            
+            {/* Blockchain Attendance Records */}
+            <BlockchainAttendance />
             
             {/* Wallet Section */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">

@@ -4,6 +4,7 @@ import QRCodeGenerator from '../../components/QRCodeGenerator';
 import CourseForm from '../../components/CourseForm';
 import { getTeacherCourses } from '../../utils/supabaseClient';
 import { Calendar, FileText, Settings, Search, Download, BarChart2, Users, Award, User, Menu, X, BookOpen, QrCode, PlusCircle, GraduationCap } from 'lucide-react';
+import BlockchainAttendance from '../../components/BlockchainAttendance';
 
 const TeacherDashboard = () => {
   const { user, profile } = useAuth();
@@ -381,6 +382,9 @@ const TeacherDashboard = () => {
 
           {/* Right Column - Course Form or QR Code */}
           <div className="w-full lg:w-1/3 space-y-4 lg:space-y-6">
+            {/* Blockchain Attendance Records */}
+            <BlockchainAttendance />
+
             {/* New Course Form */}
             {showCourseForm ? (
               <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">

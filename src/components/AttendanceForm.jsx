@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { markAttendance, validateAttendanceCode } from '../utils/supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { useWeb3 } from '../context/Web3Context';
+import { markAttendance as markBlockchainAttendance } from '../utils/contractUtils';
+import { markAttendance, validateAttendanceCode } from '../utils/supabaseClient';
 import { createAttendanceRecord } from '../utils/attendanceUtils';
 import { isWithinCampus } from '../utils/locationUtils';
 
 const AttendanceForm = ({ onAttendanceMarked }) => {
   const { user, profile } = useAuth();
+  const { walletAddress, provider } = useWeb3();
   const [attendanceCode, setAttendanceCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -31,11 +34,17 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
               codeData.id
             );
 
-            // Record attendance
+            // Record attendance in database
             const { data, error } = await markAttendance(attendanceData);
 
             if (error) {
               throw error;
+            }
+
+            // Mark attendance on blockchain
+            if (walletAddress && provider) {
+              const signer = await provider.getSigner();
+              await markBlockchainAttendance(signer, attendanceCode);
             }
 
             resolve(data);
@@ -63,6 +72,11 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
       return;
     }
 
+    if (!walletAddress) {
+      setError('Please connect your wallet to mark attendance');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError('');
@@ -80,7 +94,7 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
       const data = await checkLocationAndMarkAttendance(codeData);
 
       // Success
-      setSuccess('Attendance marked successfully!');
+      setSuccess('Attendance marked successfully on both database and blockchain!');
       setAttendanceCode('');
       
       // Notify parent component
@@ -115,11 +129,17 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
         
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !walletAddress}
           className="btn btn-primary w-full"
         >
           {isSubmitting ? 'Submitting...' : 'Mark Attendance'}
         </button>
+        
+        {!walletAddress && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 text-sm text-yellow-700">
+            Please connect your wallet to mark attendance
+          </div>
+        )}
         
         {error && (
           <div className="bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700">
