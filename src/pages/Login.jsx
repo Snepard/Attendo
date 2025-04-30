@@ -1,30 +1,69 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // Make sure the path is correct
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function LavenderLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { signIn } = useAuth();
+  
+  const { user, signIn, isStudent, isTeacher } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Check if user is already logged in and redirect accordingly
+  useEffect(() => {
+    if (user) {
+      if (isTeacher) {
+        navigate('/teacher/dashboard');
+      } else if (isStudent) {
+        navigate('/student/dashboard');
+      }
+    }
+  }, [user, isStudent, isTeacher, navigate]);
+  
+  // Display any messages passed in location state
+  useEffect(() => {
+    if (location.state?.message) {
+      // Display success message if coming from signup
+      setError('');
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
+    
+    if (!email || !password) {
+      setError('Please enter both email and password');
+      return;
+    }
+    
     try {
-      await signIn(email, password);
-      navigate('/'); // Redirect after login
+      setIsLoading(true);
+      setError('');
+      
+      const result = await signIn(email, password);
+      console.log('Sign in result:', result);
+      
+      if (result.profile?.role === 'teacher') {
+        navigate('/teacher/dashboard');
+      } else if (result.profile?.role === 'student') {
+        navigate('/student/dashboard');
+      } else {
+        setError('Login successful but role not recognized');
+      }
     } catch (err) {
       console.error('Login error:', err);
-      setError(err.message || 'Login failed');
+      setError(err.message || 'Failed to sign in');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="bg-purple-50 min-h-screen flex items-center justify-center p-2">
-      <div className="bg-white rounded-2xl shadow-lg w-full max-w-3xl flex flex-col md:flex-row overflow-hidden transition-all duration-500 scale-[0.85]">
+      <div className="bg-white rounded-2xl shadow-lg w-full max-w-3xl flex flex-col md:flex-row overflow-hidden">
         {/* Left side - Image */}
         <div className="hidden md:block md:w-1/2 bg-purple-100">
           <img
@@ -35,8 +74,14 @@ export default function LavenderLoginPage() {
         </div>
 
         {/* Right side - Login Form */}
-        <div className="w-full md:w-1/2 p-4 sm:p-6 animate-fade-in">
+        <div className="w-full md:w-1/2 p-6 sm:p-8 text-left">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Login</h1>
+
+          {location.state?.message && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded mb-4">
+              {location.state.message}
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4">
@@ -56,6 +101,7 @@ export default function LavenderLoginPage() {
                 placeholder="your.email@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
               />
             </div>
 
@@ -70,6 +116,7 @@ export default function LavenderLoginPage() {
                 placeholder="********"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
               />
             </div>
 
@@ -81,14 +128,15 @@ export default function LavenderLoginPage() {
 
             <button
               type="submit"
-              className="w-full bg-purple-500 text-white py-2 rounded-md hover:bg-purple-600 transition-all duration-300"
+              disabled={isLoading}
+              className="w-full bg-purple-500 text-white py-2 rounded-md hover:bg-purple-600 transition-colors disabled:opacity-50"
             >
-              Log In
+              {isLoading ? 'Signing In...' : 'Log In'}
             </button>
           </form>
 
           <p className="text-sm text-gray-600 mt-6 text-center">
-            Don’t have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link to="/signup" className="text-purple-600 hover:underline">
               Sign up
             </Link>

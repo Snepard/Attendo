@@ -72,9 +72,9 @@ export default function LavenderSignupPage() {
 
   return (
     <div className="bg-purple-50 min-h-screen flex items-center justify-center p-2">
-      <div className="bg-white rounded-xl shadow-md max-w-4xl w-full overflow-hidden flex flex-col lg:flex-row transform scale-95">
-        {/* Image section */}
-        <div className="w-full lg:w-1/2 bg-purple-100 hidden lg:block">
+      <div className="bg-white rounded-2xl shadow-lg w-full max-w-3xl flex flex-col md:flex-row overflow-hidden transition-all duration-500 scale-[0.85]">
+        {/* Left side - Image */}
+        <div className="hidden md:block md:w-1/2 bg-purple-100">
           <img
             src="src/assets/signup.png"
             alt="Signup illustration"
@@ -82,121 +82,115 @@ export default function LavenderSignupPage() {
           />
         </div>
 
-        {/* Form section */}
-        <div className="w-full lg:w-1/2 px-6 py-6 lg:px-10 overflow-y-auto text-left transition-all duration-300">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Sign Up</h1>
+        {/* Right side - Form */}
+        <div className="w-full md:w-1/2 p-4 sm:p-6 animate-fade-in">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">Sign Up</h1>
 
-          {/* Role Selector */}
-          <div className="flex mb-4 transition-all duration-500">
-            <button
-              onClick={() => setRole('student')}
-              className={`w-1/2 py-2 text-sm font-medium rounded-l-lg border border-purple-500 transition-all duration-300 ${
-                role === 'student' ? 'bg-purple-500 text-white' : 'bg-white text-purple-500'
-              }`}
-            >
-              I am a Student
-            </button>
-            <button
-              onClick={() => setRole('teacher')}
-              className={`w-1/2 py-2 text-sm font-medium rounded-r-lg border border-purple-500 transition-all duration-300 ${
-                role === 'teacher' ? 'bg-purple-500 text-white' : 'bg-white text-purple-500'
-              }`}
-            >
-              I am a Teacher
-            </button>
-          </div>
-
+          {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 p-2 mb-3 rounded text-sm text-red-600">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="flex space-x-3">
-              <div className="w-1/2">
-                <label className="block text-gray-700 text-sm mb-1">First Name</label>
-                <input
-                  type="text"
-                  className="w-full p-2 border text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 transition-all"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="w-1/2">
-                <label className="block text-gray-700 text-sm mb-1">Last Name</label>
-                <input
-                  type="text"
-                  className="w-full p-2 border text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 transition-all"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                />
-              </div>
+          {/* Role Toggle */}
+          <div className="flex mb-4">
+            <button
+              type="button"
+              onClick={() => setRole('student')}
+              className={`w-1/2 py-2 text-sm font-medium border border-purple-500 rounded-l ${
+                role === 'student' ? 'bg-purple-500 text-white' : 'bg-white text-purple-500'
+              }`}
+            >
+              Student
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('teacher')}
+              className={`w-1/2 py-2 text-sm font-medium border border-purple-500 rounded-r ${
+                role === 'teacher' ? 'bg-purple-500 text-white' : 'bg-white text-purple-500'
+              }`}
+            >
+              Teacher
+            </button>
+          </div>
+
+          {/* Form Fields */}
+          <form onSubmit={handleSubmit}>
+            <div className="flex space-x-2 mb-4">
+              <input
+                type="text"
+                placeholder="First Name"
+                className="w-1/2 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Last Name"
+                className="w-1/2 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
             </div>
 
-            <div>
-              <label className="block text-gray-700 text-sm mb-1">Email</label>
+            <div className="mb-4">
               <input
                 type="email"
-                className="w-full p-2 border text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 transition-all"
+                placeholder="Email"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
               />
             </div>
 
             {role === 'student' && (
-              <div className="transition-all duration-300">
-                <label className="block text-gray-700 text-sm mb-1">Roll Number</label>
+              <div className="mb-4">
                 <input
                   type="text"
-                  className="w-full p-2 border text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 transition-all"
+                  placeholder="Roll Number"
+                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
                   value={rollNumber}
                   onChange={(e) => setRollNumber(e.target.value)}
-                  required
                 />
               </div>
             )}
 
-            <div>
-              <label className="block text-gray-700 text-sm mb-1">Password</label>
+            <div className="mb-4">
               <input
                 type="password"
-                className="w-full p-2 border text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 transition-all"
+                placeholder="Password"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
               />
             </div>
 
-            <div>
-              <label className="block text-gray-700 text-sm mb-1">Confirm Password</label>
+            <div className="mb-4">
               <input
                 type="password"
-                className="w-full p-2 border text-sm border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 transition-all"
+                placeholder="Confirm Password"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                required
               />
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-purple-500 text-white py-2 text-sm rounded-md hover:bg-purple-600 transition disabled:opacity-50"
+              className="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600 transition-all duration-300 disabled:opacity-50"
             >
-              {isLoading ? 'Creating Account...' : 'Create Account'}
+              {isLoading ? 'Creating...' : 'Create Account'}
             </button>
-
-            <p className="text-sm mt-3 text-gray-600">
-              Already have an account?{' '}
-              <Link to="/login" className="text-purple-600 hover:underline">
-                Log in
-              </Link>
-            </p>
           </form>
+
+          <p className="text-sm text-gray-600 mt-6 text-center">
+            Already have an account?{' '}
+            <Link to="/login" className="text-purple-600 hover:underline">
+              Log in
+            </Link>
+          </p>
         </div>
       </div>
     </div>
