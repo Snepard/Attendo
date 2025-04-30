@@ -1,9 +1,59 @@
 import { ethers } from 'ethers';
 import { supabase } from './supabaseClient';
 
+// Telos EVM Network Configuration
+export const TELOS_NETWORK = {
+  chainId: '0x28',  // 40 in decimal
+  chainName: 'Telos EVM Mainnet',
+  nativeCurrency: {
+    name: 'TLOS',
+    symbol: 'TLOS',
+    decimals: 18
+  },
+  rpcUrls: ['https://mainnet.telos.net/evm'],
+  blockExplorerUrls: ['https://teloscan.io/']
+};
+
 // Check if MetaMask is available
 export const isMetaMaskInstalled = () => {
   return typeof window !== 'undefined' && window.ethereum !== undefined;
+};
+
+// Switch to Telos network
+export const switchToTelosNetwork = async () => {
+  if (!window.ethereum) {
+    throw new Error('MetaMask is not installed');
+  }
+
+  try {
+    // Try to switch to the Telos network
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: TELOS_NETWORK.chainId }],
+    });
+  } catch (switchError) {
+    // This error code indicates that the chain has not been added to MetaMask
+    if (switchError.code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: TELOS_NETWORK.chainId,
+            chainName: TELOS_NETWORK.chainName,
+            nativeCurrency: TELOS_NETWORK.nativeCurrency,
+            rpcUrls: TELOS_NETWORK.rpcUrls,
+            blockExplorerUrls: TELOS_NETWORK.blockExplorerUrls
+          }],
+        });
+      } catch (addError) {
+        console.error('Error adding Telos network:', addError);
+        throw new Error('Failed to add Telos network to MetaMask');
+      }
+    } else {
+      console.error('Error switching to Telos network:', switchError);
+      throw new Error('Failed to switch to Telos network');
+    }
+  }
 };
 
 // Request MetaMask connection
@@ -13,6 +63,9 @@ export const connectWallet = async () => {
   }
 
   try {
+    // Switch to Telos network first
+    await switchToTelosNetwork();
+    
     // Request account access
     const provider = new ethers.BrowserProvider(window.ethereum);
     const accounts = await provider.send('eth_requestAccounts', []);
@@ -21,6 +74,11 @@ export const connectWallet = async () => {
     // Get chain ID
     const network = await provider.getNetwork();
     const chainId = network.chainId;
+    
+    // Verify we're on Telos
+    if (chainId.toString() !== '40') {
+      throw new Error('Please switch to the Telos network');
+    }
     
     return { 
       address, 

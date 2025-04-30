@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useWeb3 } from '../context/Web3Context';
+import { TELOS_NETWORK } from '../utils/web3Utils';
 
 const WalletConnect = () => {
   const { walletAddress, connectWallet, isConnecting, error, formatAddress } = useWeb3();
@@ -23,7 +24,7 @@ const WalletConnect = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h3 className="text-lg font-semibold mb-4">Blockchain Identity</h3>
+      <h3 className="text-lg font-semibold mb-4">Telos Blockchain Identity</h3>
       
       {walletAddress ? (
         <div className="space-y-4">
@@ -36,7 +37,7 @@ const WalletConnect = () => {
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium">Wallet Connected</p>
+              <p className="text-sm font-medium">Telos Wallet Connected</p>
               <div className="relative">
                 <button 
                   onClick={copyAddressToClipboard}
@@ -57,14 +58,19 @@ const WalletConnect = () => {
           </div>
           
           <div className="bg-green-50 border-l-4 border-green-400 p-3 text-sm text-green-700">
-            <p>Your attendance is secured with blockchain technology.</p>
+            <p>Your attendance is secured on the Telos blockchain.</p>
           </div>
         </div>
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Connect your MetaMask wallet to verify your identity and secure your attendance records.
+            Connect your MetaMask wallet to the Telos network to verify your identity and secure your attendance records.
           </p>
+          
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-3 text-sm text-blue-700">
+            <p>Network: {TELOS_NETWORK.chainName}</p>
+            <p>Currency: {TELOS_NETWORK.nativeCurrency.symbol}</p>
+          </div>
           
           <button
             onClick={handleConnect}
@@ -73,7 +79,7 @@ const WalletConnect = () => {
           >
             {isConnecting ? 'Connecting...' : (
               <>
-                <span className="mr-2">Connect MetaMask</span>
+                <span className="mr-2">Connect to Telos</span>
                 <svg width="20" height="20" viewBox="0 0 33 31" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M31.1114 1L18.6025 10.1521L20.9593 4.79333L31.1114 1Z" fill="#E17726" stroke="#E17726" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M2.53174 1L14.9334 10.2339L12.6838 4.79333L2.53174 1Z" fill="#E27625" stroke="#E27625" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
