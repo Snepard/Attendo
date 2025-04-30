@@ -5,6 +5,8 @@ import { markAttendance as markBlockchainAttendance } from '../utils/contractUti
 import { markAttendance, validateAttendanceCode } from '../utils/supabaseClient';
 import { createAttendanceRecord } from '../utils/attendanceUtils';
 import { isWithinCampus } from '../utils/locationUtils';
+import QRScanner from './QRScanner';
+import { QrCode } from 'lucide-react';
 
 const AttendanceForm = ({ onAttendanceMarked }) => {
   const { user, profile } = useAuth();
@@ -13,6 +15,7 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   const checkLocationAndMarkAttendance = async (codeData) => {
     return new Promise((resolve, reject) => {
@@ -65,7 +68,9 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) {
+      e.preventDefault();
+    }
     
     if (!attendanceCode.trim()) {
       setError('Please enter an attendance code');
@@ -99,6 +104,9 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
       
       // Notify parent component
       if (onAttendanceMarked) onAttendanceMarked(data);
+      
+      // Hide QR scanner if it was open
+      setShowQRScanner(false);
     } catch (error) {
       console.error('Error marking attendance:', error);
       setError(error.message || 'Failed to mark attendance');
@@ -107,52 +115,81 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
     }
   };
 
+  const handleQRCodeScanned = (code) => {
+    setAttendanceCode(code);
+    setShowQRScanner(false);
+    // Auto-submit once QR code is scanned
+    setTimeout(() => handleSubmit(), 500);
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <h3 className="text-lg font-semibold mb-4">Mark Attendance</h3>
       
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="attendanceCode" className="label">
-            Enter Attendance Code
-          </label>
-          <input
-            id="attendanceCode"
-            type="text"
-            value={attendanceCode}
-            onChange={(e) => setAttendanceCode(e.target.value)}
-            placeholder="Enter code or scan QR"
-            className="input uppercase"
-            maxLength={6}
-          />
+      {showQRScanner ? (
+        <div className="mb-4">
+          <QRScanner onScan={handleQRCodeScanned} />
+          <button 
+            onClick={() => setShowQRScanner(false)}
+            className="btn btn-secondary w-full mt-2"
+          >
+            Cancel Scan
+          </button>
         </div>
-        
-        <button
-          type="submit"
-          disabled={isSubmitting || !walletAddress}
-          className="btn btn-primary w-full"
-        >
-          {isSubmitting ? 'Submitting...' : 'Mark Attendance'}
-        </button>
-        
-        {!walletAddress && (
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 text-sm text-yellow-700">
-            Please connect your wallet to mark attendance
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="attendanceCode" className="label">
+              Enter Attendance Code
+            </label>
+            <div className="flex space-x-2">
+              <input
+                id="attendanceCode"
+                type="text"
+                value={attendanceCode}
+                onChange={(e) => setAttendanceCode(e.target.value.toUpperCase())}
+                placeholder="Enter code or scan QR"
+                className="input uppercase flex-1"
+                maxLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowQRScanner(true)}
+                className="btn btn-secondary px-3"
+                aria-label="Scan QR Code"
+              >
+                <QrCode size={20} />
+              </button>
+            </div>
           </div>
-        )}
-        
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-        
-        {success && (
-          <div className="bg-green-50 border-l-4 border-green-400 p-3 text-sm text-green-700">
-            {success}
-          </div>
-        )}
-      </form>
+          
+          <button
+            type="submit"
+            disabled={isSubmitting || !walletAddress}
+            className="btn btn-primary w-full"
+          >
+            {isSubmitting ? 'Submitting...' : 'Mark Attendance'}
+          </button>
+          
+          {!walletAddress && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 text-sm text-yellow-700">
+              Please connect your wallet to mark attendance
+            </div>
+          )}
+          
+          {error && (
+            <div className="bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+          
+          {success && (
+            <div className="bg-green-50 border-l-4 border-green-400 p-3 text-sm text-green-700">
+              {success}
+            </div>
+          )}
+        </form>
+      )}
     </div>
   );
 };

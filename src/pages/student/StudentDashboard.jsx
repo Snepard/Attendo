@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getStudentAttendance } from '../../utils/supabaseClient';
-import { Bell, Calendar, FileText, Settings, Search, Download, BarChart2, Clock, Award, User, Menu, X } from 'lucide-react';
+import { Bell, Calendar, FileText, Settings, Search, Download, BarChart2, Clock, Award, User, Menu, X, QrCode, Camera } from 'lucide-react';
 
 // Reusing existing components
 import WalletConnect from '../../components/WalletConnect';
 import AttendanceForm from '../../components/AttendanceForm';
 import BlockchainAttendance from '../../components/BlockchainAttendance';
+import QRScanner from '../../components/QRScanner'; // We'll need to create this component
 
 const StudentDashboard = () => {
   const { user, profile } = useAuth();
@@ -15,6 +16,7 @@ const StudentDashboard = () => {
   const [error, setError] = useState('');
   const [dateRange, setDateRange] = useState({ start: '01 Dec', end: '31 Dec' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false); // State to toggle QR scanner visibility
 
   // Get current date for calendar
   const currentDate = new Date();
@@ -51,6 +53,18 @@ const StudentDashboard = () => {
   // Handle when new attendance is marked
   const handleAttendanceMarked = (newAttendance) => {
     setAttendanceRecords([newAttendance, ...attendanceRecords]);
+    setShowQRScanner(false); // Hide QR scanner after successful attendance marking
+  };
+
+  // Handle QR code scan result
+  const handleQRScan = (qrData) => {
+    // Process the QR code data (typically an attendance code)
+    console.log("QR Code scanned:", qrData);
+    // You may want to automatically submit this data to the AttendanceForm
+    // or directly process it to mark attendance
+    
+    // For now, we'll just hide the scanner and assume the code is handled by the form
+    setShowQRScanner(false);
   };
 
   // Monthly attendance stats (mock data based on records)
@@ -91,6 +105,11 @@ const StudentDashboard = () => {
   // Toggle mobile menu
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  // Toggle QR scanner
+  const toggleQRScanner = () => {
+    setShowQRScanner(!showQRScanner);
   };
 
   return (
@@ -392,11 +411,49 @@ const StudentDashboard = () => {
           <div className="w-full lg:w-1/3 space-y-4 lg:space-y-6">
             {/* Mark Attendance Tool */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">
-              <div className="flex items-center space-x-2 mb-4">
-                <User size={18} className="text-purple-600" />
-                <h2 className="font-semibold text-sm sm:text-base">Mark Attendance</h2>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <User size={18} className="text-purple-600" />
+                  <h2 className="font-semibold text-sm sm:text-base">Mark Attendance</h2>
+                </div>
+                {/* QR Code Scan Button */}
+                <button 
+                  onClick={toggleQRScanner}
+                  className="bg-purple-100 hover:bg-purple-200 text-purple-700 p-2 rounded-full flex items-center justify-center transition-colors"
+                >
+                  <QrCode size={18} />
+                </button>
               </div>
-              <AttendanceForm onAttendanceMarked={handleAttendanceMarked} />
+              
+              {/* QR Scanner */}
+              {showQRScanner ? (
+                <div className="relative mb-4">
+                  <div className="bg-gray-50 rounded-lg overflow-hidden">
+                    <div className="p-4 text-center">
+                      <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Camera size={24} className="text-purple-600" />
+                      </div>
+                      <h3 className="text-sm font-medium text-gray-800 mb-1">Scan QR Code</h3>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Position the QR code within the scanning area
+                      </p>
+                      
+                      {/* QR Scanner Component */}
+                      <QRScanner onScan={handleQRScan} />
+                      
+                      {/* Cancel Button */}
+                      <button 
+                        onClick={() => setShowQRScanner(false)}
+                        className="mt-4 text-sm text-purple-600 hover:text-purple-800"
+                      >
+                        Cancel Scan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <AttendanceForm onAttendanceMarked={handleAttendanceMarked} />
+              )}
             </div>
             
             {/* Blockchain Attendance Records */}
