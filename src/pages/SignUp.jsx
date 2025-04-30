@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import signupImage from '../assets/signup.png';
+import signupImage from '../assets/signup.jpg';
 
 export default function LavenderSignupPage() {
   const [firstName, setFirstName] = useState('');

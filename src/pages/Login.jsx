@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import loginImage from '../assets/login.png';
+import loginImage from '../assets/login.jpg';
 
 
 export default function LavenderLoginPage() {
