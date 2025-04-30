@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import signupImage from '../assets/signup.png';
 
 export default function LavenderSignupPage() {
   const [firstName, setFirstName] = useState('');
@@ -76,7 +77,7 @@ export default function LavenderSignupPage() {
         {/* Left side - Image */}
         <div className="hidden md:block md:w-1/2 bg-purple-100">
           <img
-            src="src/assets/signup.png"
+            src={signupImage}
             alt="Signup illustration"
             className="w-full h-full object-cover"
           />

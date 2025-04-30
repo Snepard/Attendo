@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import loginImage from '../assets/login.png';
+
 
 export default function LavenderLoginPage() {
   const [email, setEmail] = useState('');
@@ -67,7 +69,7 @@ export default function LavenderLoginPage() {
         {/* Left side - Image */}
         <div className="hidden md:block md:w-1/2 bg-purple-100">
           <img
-            src="src/assets/login.png"
+            src={loginImage}
             alt="Login illustration"
             className="w-full h-full object-cover"
           />
