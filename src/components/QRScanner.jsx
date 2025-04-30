@@ -1,202 +1,163 @@
-import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useWeb3 } from '../context/Web3Context';
-import { markAttendance as markBlockchainAttendance } from '../utils/contractUtils';
-import { markAttendance, validateAttendanceCode } from '../utils/supabaseClient';
-import { createAttendanceRecord } from '../utils/attendanceUtils';
-import { isWithinCampus } from '../utils/locationUtils';
-import QRScanner from './QRScanner';
-import { QrCode } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Camera, QrCode, AlertTriangle } from 'lucide-react';
 
-const AttendanceForm = ({ onAttendanceMarked }) => {
-  const { user, profile } = useAuth();
-  const { walletAddress, provider } = useWeb3();
-  const [attendanceCode, setAttendanceCode] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+// This component uses an HTML5 QR Code scanner
+// npm install html5-qrcode --save
+
+const QRScanner = ({ onScan }) => {
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [showQRScanner, setShowQRScanner] = useState(false);
-
-  const checkLocationAndMarkAttendance = async (codeData) => {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          if (!isWithinCampus(latitude, longitude)) {
-            reject(new Error('You must be within campus area to mark attendance'));
-            return;
-          }
-
-          try {
-            // Create attendance record
-            const attendanceData = createAttendanceRecord(
-              user.id, 
-              codeData.course_id,
-              attendanceCode,
-              codeData.id
-            );
-
-            // Record attendance in database
-            const { data, error } = await markAttendance(attendanceData);
-
-            if (error) {
-              throw error;
-            }
-
-            // Mark attendance on blockchain
-            if (walletAddress && provider) {
-              const signer = await provider.getSigner();
-              await markBlockchainAttendance(signer, attendanceCode);
-            }
-
-            resolve(data);
-          } catch (error) {
-            reject(error);
-          }
-        },
-        (error) => {
-          reject(new Error('Please enable location access to mark attendance'));
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0
-        }
-      );
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    if (e) {
-      e.preventDefault();
-    }
-    
-    if (!attendanceCode.trim()) {
-      setError('Please enter an attendance code');
-      return;
-    }
-
-    if (!walletAddress) {
-      setError('Please connect your wallet to mark attendance');
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      setError('');
-      setSuccess('');
-
-      // Validate the attendance code
-      const { data: codeData, error: codeError } = await validateAttendanceCode(attendanceCode);
-
-      if (codeError || !codeData) {
-        setError('Invalid or expired attendance code');
-        return;
+  const html5QrCodeRef = useRef(null);
+  
+  useEffect(() => {
+    // Clean up any existing scanner instances first
+    const existingElement = document.getElementById('qr-reader');
+    if (existingElement) {
+      while (existingElement.firstChild) {
+        existingElement.removeChild(existingElement.firstChild);
       }
-
-      // Check location and mark attendance
-      const data = await checkLocationAndMarkAttendance(codeData);
-
-      // Success
-      setSuccess('Attendance marked successfully on both database and blockchain!');
-      setAttendanceCode('');
-      
-      // Notify parent component
-      if (onAttendanceMarked) onAttendanceMarked(data);
-      
-      // Hide QR scanner if it was open
-      setShowQRScanner(false);
-    } catch (error) {
-      console.error('Error marking attendance:', error);
-      setError(error.message || 'Failed to mark attendance');
-    } finally {
-      setIsSubmitting(false);
     }
-  };
-
-  const handleQRCodeScanned = (code) => {
-    console.log("QR code received in AttendanceForm:", code);
-    setAttendanceCode(code);
-    setShowQRScanner(false);
     
-    // Auto-submit with a small delay to allow state update
-    setTimeout(() => {
-      console.log("Auto-submitting with code:", code);
-      handleSubmit();
-    }, 800);
+    let scanner = null;
+    
+    const initScanner = async () => {
+      try {
+        // Check if the browser supports media devices
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setError('Camera access is not supported by your browser');
+          return;
+        }
+        
+        // Dynamically import the library
+        const { Html5Qrcode } = await import('html5-qrcode');
+        
+        // Create a new scanner instance
+        scanner = new Html5Qrcode("qr-reader");
+        html5QrCodeRef.current = scanner;
+        
+        setScanning(true);
+        
+        const qrCodeSuccessCallback = (decodedText) => {
+          console.log("QR Code scanned successfully:", decodedText);
+          
+          // Send result to parent
+          onScan(decodedText);
+          
+          // Stop scanner if running
+          if (scanner && scanner.isScanning) {
+            scanner.stop().then(() => {
+              console.log("Scanner stopped");
+            }).catch(err => {
+              console.error("Error stopping scanner:", err);
+            });
+          }
+        };
+        
+        const config = { 
+          fps: 10, 
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0
+        };
+        
+        // Start scanning
+        await scanner.start(
+          { facingMode: "environment" },
+          config,
+          qrCodeSuccessCallback,
+          (errorMessage) => {
+            // QR scanning errors are not critical
+            console.log(`QR Scan error: ${errorMessage}`);
+          }
+        );
+      } catch (error) {
+        console.error("QR Scanner error:", error);
+        setError('Failed to initialize camera. Please check camera permissions.');
+        setScanning(false);
+      }
+    };
+    
+    // Start scanner on mount
+    initScanner();
+    
+    // Clean up on unmount
+    return () => {
+      if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+        html5QrCodeRef.current.stop().catch(err => {
+          console.error("Failed to stop camera on unmount:", err);
+        });
+      }
+    };
+  }, []); // Empty array means this runs once on mount
+  
+  const handleRetry = () => {
+    setError('');
+    // Force refresh by re-mounting component
+    if (html5QrCodeRef.current) {
+      html5QrCodeRef.current.clear();
+      html5QrCodeRef.current = null;
+    }
+    window.location.reload(); // If necessary, reload the page
   };
-
+  
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h3 className="text-lg font-semibold mb-4">Mark Attendance</h3>
-      
-      {showQRScanner ? (
-        <div className="mb-4">
-          <QRScanner onScan={handleQRCodeScanned} />
+    <div className="qr-scanner">
+      {error ? (
+        <div className="bg-red-50 p-4 rounded-lg text-center">
+          <div className="flex justify-center mb-2">
+            <AlertTriangle size={24} className="text-red-500" />
+          </div>
+          <p className="text-red-600 text-sm">{error}</p>
           <button 
-            onClick={() => setShowQRScanner(false)}
-            className="btn btn-secondary w-full mt-2"
+            onClick={handleRetry}
+            className="mt-3 bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded-md text-xs"
           >
-            Cancel Scan
+            Retry
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="attendanceCode" className="label">
-              Enter Attendance Code
-            </label>
-            <div className="flex space-x-2">
-              <input
-                id="attendanceCode"
-                type="text"
-                value={attendanceCode}
-                onChange={(e) => setAttendanceCode(e.target.value.toUpperCase())}
-                placeholder="Enter code or scan QR"
-                className="input uppercase flex-1"
-                maxLength={6}
-              />
-              <button
-                type="button"
-                onClick={() => setShowQRScanner(true)}
-                className="btn btn-secondary px-3"
-                aria-label="Scan QR Code"
-              >
-                <QrCode size={20} />
-              </button>
+        <>
+          <div className="relative bg-gray-800 rounded-lg overflow-hidden">
+            {/* QR Scanner container - must have this exact ID */}
+            <div 
+              id="qr-reader" 
+              className="w-full aspect-square max-w-xs mx-auto overflow-hidden"
+            ></div>
+            
+            {/* Scan overlay with targeting UI */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="border-2 border-white opacity-70 w-48 h-48 rounded-lg"></div>
+              </div>
             </div>
           </div>
           
-          <button
-            type="submit"
-            disabled={isSubmitting || !walletAddress}
-            className="btn btn-primary w-full"
-          >
-            {isSubmitting ? 'Submitting...' : 'Mark Attendance'}
-          </button>
-          
-          {!walletAddress && (
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 text-sm text-yellow-700">
-              Please connect your wallet to mark attendance
+          <div className="text-center mt-3">
+            <div className="flex items-center justify-center text-xs text-gray-600">
+              <div className="animate-pulse flex items-center">
+                <QrCode size={14} className="mr-1 text-purple-600" />
+                <span>Scanning...</span>
+              </div>
             </div>
-          )}
-          
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 p-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-          
-          {success && (
-            <div className="bg-green-50 border-l-4 border-green-400 p-3 text-sm text-green-700">
-              {success}
-            </div>
-          )}
-        </form>
+          </div>
+        </>
       )}
+      
+      <style jsx>{`
+        /* Custom CSS for QR scanner */
+        #qr-reader {
+          width: 100%;
+          max-width: 300px;
+          margin: 0 auto;
+        }
+        #qr-reader video {
+          object-fit: cover;
+        }
+        #qr-reader img {
+          display: none; /* Hide QR scanner image */
+        }
+      `}</style>
     </div>
   );
 };
 
-export default AttendanceForm;
+export default QRScanner;

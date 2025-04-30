@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useWeb3 } from '../context/Web3Context';
 import { markAttendance as markBlockchainAttendance } from '../utils/contractUtils';
@@ -116,10 +116,15 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
   };
 
   const handleQRCodeScanned = (code) => {
+    console.log("QR code received in AttendanceForm:", code);
     setAttendanceCode(code);
     setShowQRScanner(false);
-    // Auto-submit once QR code is scanned
-    setTimeout(() => handleSubmit(), 500);
+    
+    // Auto-submit with a small delay to allow state update
+    setTimeout(() => {
+      console.log("Auto-submitting with code:", code);
+      handleSubmit();
+    }, 800);
   };
 
   return (
@@ -128,9 +133,17 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
       
       {showQRScanner ? (
         <div className="mb-4">
-          <QRScanner onScan={handleQRCodeScanned} />
+          <QRScanner 
+            onScan={(code) => {
+              console.log("QR Code detected:", code);
+              handleQRCodeScanned(code);
+            }} 
+          />
           <button 
-            onClick={() => setShowQRScanner(false)}
+            onClick={() => {
+              console.log("Cancelling QR scanner");
+              setShowQRScanner(false);
+            }}
             className="btn btn-secondary w-full mt-2"
           >
             Cancel Scan
@@ -154,7 +167,10 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
               />
               <button
                 type="button"
-                onClick={() => setShowQRScanner(true)}
+                onClick={() => {
+                  console.log("Opening QR scanner");
+                  setShowQRScanner(true);
+                }}
                 className="btn btn-secondary px-3"
                 aria-label="Scan QR Code"
               >
