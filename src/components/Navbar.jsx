@@ -27,10 +27,14 @@ const Navbar = () => {
 
   return (
     <nav className="bg-white shadow-md">
-      <div className="container mx-auto px-4 py-3">
+      <div className="container mx-auto px-4 py-2">
         <div className="flex justify-between items-center">
           <Link to={user ? (isStudent ? '/student/dashboard' : '/teacher/dashboard') : '/'} className="text-xl font-bold text-primary-500 flex items-center">
-            <span className="text-2xl mr-2">⏱</span> Attendo
+            <img 
+              src="/logo.jpeg" 
+              alt="Attendo" 
+              className="h-9" 
+            />
           </Link>
 
           {user ? (
@@ -113,4 +117,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar;  
+export default Navbar;
