@@ -2,21 +2,26 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getStudentAttendance } from '../../utils/supabaseClient';
 import { Bell, Calendar, FileText, Settings, Search, Download, BarChart2, Clock, Award, User, Menu, X, QrCode, Camera } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 // Reusing existing components
 import WalletConnect from '../../components/WalletConnect';
 import AttendanceForm from '../../components/AttendanceForm';
 import BlockchainAttendance from '../../components/BlockchainAttendance';
-import QRScanner from '../../components/QRScanner'; // We'll need to create this component
+import QRScanner from '../../components/QRScanner';
 
 const StudentDashboard = () => {
   const { user, profile } = useAuth();
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [dateRange, setDateRange] = useState({ start: '01 Dec', end: '31 Dec' });
+  const [dateRange, setDateRange] = useState({ 
+    start: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), 
+    end: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showQRScanner, setShowQRScanner] = useState(false); // State to toggle QR scanner visibility
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [totalClasses, setTotalClasses] = useState(30); // Total expected classes
 
   // Get current date for calendar
   const currentDate = new Date();
@@ -53,19 +58,30 @@ const StudentDashboard = () => {
   // Handle when new attendance is marked
   const handleAttendanceMarked = (newAttendance) => {
     setAttendanceRecords([newAttendance, ...attendanceRecords]);
-    setShowQRScanner(false); // Hide QR scanner after successful attendance marking
+    setShowQRScanner(false);
   };
 
   // Handle QR code scan result
   const handleQRScan = (qrData) => {
-    // Process the QR code data (typically an attendance code)
-    console.log("QR Code scanned:", qrData);
-    // You may want to automatically submit this data to the AttendanceForm
-    // or directly process it to mark attendance
-    
-    // For now, we'll just hide the scanner and assume the code is handled by the form
     setShowQRScanner(false);
   };
+
+  // Calculate attendance stats based on actual records
+  const getAttendanceStats = () => {
+    if (!attendanceRecords.length) return { present: 0, late: 0, absent: 0 };
+    
+    const present = attendanceRecords.filter(r => !r.is_late).length;
+    const late = attendanceRecords.filter(r => r.is_late).length;
+    const total = totalClasses; // Using total expected classes
+    
+    return {
+      present: Math.round((present / total) * 100),
+      late: Math.round((late / total) * 100),
+      absent: Math.round(((total - present - late) / total) * 100)
+    };
+  };
+
+  const stats = getAttendanceStats();
 
   // Monthly attendance stats (mock data based on records)
   const getMonthlyStats = () => {
@@ -76,8 +92,6 @@ const StudentDashboard = () => {
       absent: 100 - (Math.round((attendanceRecords.length / 30) * 100) || 0)
     };
   };
-
-  const stats = getMonthlyStats();
 
   // Calculate employment status (mock data)
   const employmentStats = {
@@ -135,18 +149,18 @@ const StudentDashboard = () => {
         {isMobileMenuOpen && (
           <div className="bg-white border-t p-4 animate-fadeIn">
             <div className="grid grid-cols-3 gap-4">
-              <button className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-purple-50">
+              <Link to="/student/calendar" className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-purple-50">
                 <Calendar size={20} className="text-purple-600 mb-1" />
                 <span className="text-xs">Calendar</span>
-              </button>
-              <button className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-purple-50">
+              </Link>
+              <Link to="/student/stats" className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-purple-50">
                 <BarChart2 size={20} className="text-purple-600 mb-1" />
                 <span className="text-xs">Stats</span>
-              </button>
-              <button className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-purple-50">
+              </Link>
+              <Link to="/student/profile" className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-purple-50">
                 <User size={20} className="text-purple-600 mb-1" />
                 <span className="text-xs">Profile</span>
-              </button>
+              </Link>
             </div>
           </div>
         )}
@@ -164,10 +178,13 @@ const StudentDashboard = () => {
                   <h1 className="text-xl sm:text-2xl font-bold">Hi, {profile?.first_name || 'Student'}!!</h1>
                   <p className="text-gray-600 text-sm sm:text-base">Manage your education with Attendo</p>
                 </div>
-                <button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-2 px-4 sm:px-6 rounded-full flex items-center justify-center space-x-2 text-sm sm:text-base">
+                <Link 
+                  to="/student/reports"
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-2 px-4 sm:px-6 rounded-full flex items-center justify-center space-x-2 text-sm sm:text-base"
+                >
                   <FileText size={16} />
                   <span>Create Reports</span>
-                </button>
+                </Link>
               </div>
             </div>
 
@@ -183,7 +200,7 @@ const StudentDashboard = () => {
                   <div className="text-xs sm:text-sm bg-gray-100 px-2 sm:px-3 py-1 rounded-full text-gray-600">{dateRange.start} - {dateRange.end}</div>
                 </div>
                 
-                {/* Bar Chart Visualization (simplified) */}
+                {/* Bar Chart Visualization */}
                 <div className="h-32 sm:h-40 flex items-end justify-between space-x-1 sm:space-x-2 mb-4 sm:mb-6">
                   {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'].map((month, index) => {
                     const height = 20 + Math.random() * 60;
@@ -199,7 +216,7 @@ const StudentDashboard = () => {
                   })}
                 </div>
                 
-                {/* Tooltip-like callout */}
+                {/* Stats Summary */}
                 {attendanceRecords.length > 0 && (
                   <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white p-3 sm:p-4 rounded-lg shadow-lg max-w-xs relative mb-4 sm:mb-6">
                     <div className="absolute bottom-full left-1/4 w-3 h-3 sm:w-4 sm:h-4 transform rotate-45 bg-gray-900"></div>
@@ -210,81 +227,42 @@ const StudentDashboard = () => {
                       </li>
                       <li className="flex items-center">
                         <span className="w-2 h-2 sm:w-3 sm:h-3 bg-purple-500 rounded-full mr-2"></span>
-                        <span>Attendance Rate: {100 - stats.absent}%</span>
+                        <span>Attendance Rate: {stats.present}%</span>
                       </li>
                       <li className="flex items-center">
                         <span className="w-2 h-2 sm:w-3 sm:h-3 bg-orange-500 rounded-full mr-2"></span>
-                        <span>Punctuality: {stats.onTime}%</span>
+                        <span>Punctuality: {100 - stats.late}%</span>
                       </li>
                     </ul>
                   </div>
                 )}
               </div>
 
-              {/* Attendance Status */}
-              <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">
-                <div className="flex justify-between items-center mb-4 sm:mb-6">
-                  <div className="flex items-center space-x-2">
-                    <Award size={18} className="text-purple-600" />
-                    <h2 className="font-semibold text-sm sm:text-base">Attendance Status</h2>
-                  </div>
-                  <div className="text-xs sm:text-sm bg-purple-100 px-2 sm:px-3 py-1 rounded-full text-purple-800 font-medium">Total: {attendanceRecords.length || 0}</div>
-                </div>
+              {/* Quick Links */}
+              <div className="space-y-3">
+                <Link 
+                  to="/student/attendance-records" 
+                  className="w-full text-left px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors flex items-center text-sm"
+                >
+                  <Calendar size={16} className="mr-3 text-purple-500" />
+                  View Attendance Records
+                </Link>
                 
-                {/* Attendance Type Breakdown */}
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="flex items-center">
-                        <span className="w-2 h-2 sm:w-3 sm:h-3 bg-green-500 rounded-full mr-2"></span>
-                        <span className="text-xs sm:text-sm">On Time</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="mr-2 w-12 sm:w-16 text-right text-xs sm:text-sm">{stats.onTime}%</div>
-                      <div className="w-24 sm:w-32 bg-gray-200 rounded-full h-1.5 sm:h-2">
-                        <div className="bg-green-500 h-1.5 sm:h-2 rounded-full" style={{ width: `${stats.onTime}%` }}></div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="flex items-center">
-                        <span className="w-2 h-2 sm:w-3 sm:h-3 bg-yellow-500 rounded-full mr-2"></span>
-                        <span className="text-xs sm:text-sm">Late</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="mr-2 w-12 sm:w-16 text-right text-xs sm:text-sm">{stats.late}%</div>
-                      <div className="w-24 sm:w-32 bg-gray-200 rounded-full h-1.5 sm:h-2">
-                        <div className="bg-yellow-500 h-1.5 sm:h-2 rounded-full" style={{ width: `${stats.late}%` }}></div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="flex items-center">
-                        <span className="w-2 h-2 sm:w-3 sm:h-3 bg-red-500 rounded-full mr-2"></span>
-                        <span className="text-xs sm:text-sm">Absent</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="mr-2 w-12 sm:w-16 text-right text-xs sm:text-sm">{stats.absent}%</div>
-                      <div className="w-24 sm:w-32 bg-gray-200 rounded-full h-1.5 sm:h-2">
-                        <div className="bg-red-500 h-1.5 sm:h-2 rounded-full" style={{ width: `${stats.absent}%` }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <Link 
+                  to="/student/transcript" 
+                  className="w-full text-left px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors flex items-center text-sm"
+                >
+                  <FileText size={16} className="mr-3 text-purple-500" />
+                  Download Transcript
+                </Link>
                 
-                <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t">
-                  <a href="#" className="text-purple-600 text-xs sm:text-sm flex items-center hover:text-purple-800 transition-colors">
-                    See All Insights
-                    <span className="ml-1">▶</span>
-                  </a>
-                </div>
+                <Link 
+                  to="/student/profile" 
+                  className="w-full text-left px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors flex items-center text-sm"
+                >
+                  <User size={16} className="mr-3 text-purple-500" />
+                  Update Profile
+                </Link>
               </div>
             </div>
 
@@ -306,13 +284,17 @@ const StudentDashboard = () => {
                     <Download size={14} />
                     <span>Export</span>
                   </button>
-                  <button className="text-purple-600 hover:bg-purple-50 px-2 sm:px-3 py-1 border border-purple-200 rounded-md flex items-center space-x-1 transition-colors text-xs sm:text-sm">
+                  <Link 
+                    to="/student/reports"
+                    className="text-purple-600 hover:bg-purple-50 px-2 sm:px-3 py-1 border border-purple-200 rounded-md flex items-center space-x-1 transition-colors text-xs sm:text-sm"
+                  >
                     <FileText size={14} />
                     <span>View report</span>
-                  </button>
+                  </Link>
                 </div>
               </div>
               
+              {/* Attendance Records Content */}
               {isLoading ? (
                 <div className="flex justify-center items-center h-40">
                   <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-purple-500"></div>
@@ -332,82 +314,47 @@ const StudentDashboard = () => {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto -mx-4 sm:mx-0">
-                  <div className="inline-block min-w-full align-middle">
-                    <table className="min-w-full">
-                      <thead>
-                        <tr className="text-left text-gray-500 text-xs sm:text-sm bg-gray-50">
-                          <th className="py-2 sm:py-3 px-4 sm:px-2 rounded-l-lg">Name</th>
-                          <th className="py-2 sm:py-3 px-4 sm:px-2">Status</th>
-                          <th className="py-2 sm:py-3 px-4 sm:px-2">Date</th>
-                          <th className="py-2 sm:py-3 px-4 sm:px-2">Clock In</th>
-                          <th className="py-2 sm:py-3 px-4 sm:px-2 hidden sm:table-cell">Clock Out</th>
-                          <th className="py-2 sm:py-3 px-4 sm:px-2 hidden md:table-cell">Schedule In</th>
-                          <th className="py-2 sm:py-3 px-4 sm:px-2 hidden md:table-cell rounded-r-lg">Schedule Out</th>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead>
+                      <tr className="text-left text-gray-500 text-xs sm:text-sm">
+                        <th className="py-2 sm:py-3 px-4 sm:px-6">Date</th>
+                        <th className="py-2 sm:py-3 px-4 sm:px-6">Status</th>
+                        <th className="py-2 sm:py-3 px-4 sm:px-6">Time In</th>
+                        <th className="py-2 sm:py-3 px-4 sm:px-6">Time Out</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {attendanceRecords.map((record, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="py-2 sm:py-3 px-4 sm:px-6 text-sm">
+                            {new Date(record.date).toLocaleDateString()}
+                          </td>
+                          <td className="py-2 sm:py-3 px-4 sm:px-6">
+                            <span className={`inline-block px-2 py-1 rounded-full text-xs ${
+                              record.is_late 
+                                ? 'bg-yellow-100 text-yellow-800' 
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {record.is_late ? 'Late' : 'On Time'}
+                            </span>
+                          </td>
+                          <td className="py-2 sm:py-3 px-4 sm:px-6 text-sm">
+                            {record.time_in}
+                          </td>
+                          <td className="py-2 sm:py-3 px-4 sm:px-6 text-sm">
+                            {record.time_out || '-'}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {attendanceRecords.slice(0, 4).map((record, index) => (
-                          <tr key={record.id || index} className="hover:bg-gray-50 transition-colors">
-                            <td className="py-2 sm:py-3 px-4 sm:px-2">
-                              <div className="flex items-center">
-                                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white flex items-center justify-center mr-2 sm:mr-3">
-                                  {profile?.first_name?.charAt(0) || 'S'}
-                                </div>
-                                <div>
-                                  <div className="font-medium text-xs sm:text-sm">{profile?.first_name || 'Student'} {profile?.last_name || ''}</div>
-                                  <div className="text-xs text-gray-500 hidden sm:block">Student</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-2 sm:py-3 px-4 sm:px-2">
-                              <span className={`inline-block px-2 py-0.5 sm:py-1 rounded-md text-xs ${
-                                record.is_late 
-                                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' 
-                                  : 'bg-green-100 text-green-800 border border-green-200'
-                              }`}>
-                                {record.is_late ? 'Late' : 'On Time'}
-                              </span>
-                            </td>
-                            <td className="py-2 sm:py-3 px-4 sm:px-2 text-xs sm:text-sm">
-                              {new Date(record.created_at).toLocaleDateString()}
-                            </td>
-                            <td className="py-2 sm:py-3 px-4 sm:px-2 text-xs sm:text-sm font-medium text-gray-700">
-                              <div className="flex items-center">
-                                <Clock size={12} className="mr-1 text-purple-500" />
-                                {record.check_in_time || '09:00'}
-                              </div>
-                            </td>
-                            <td className="py-2 sm:py-3 px-4 sm:px-2 text-xs sm:text-sm font-medium text-gray-700 hidden sm:table-cell">
-                              <div className="flex items-center">
-                                <Clock size={12} className="mr-1 text-indigo-500" />
-                                {record.check_out_time || '17:07'}
-                              </div>
-                            </td>
-                            <td className="py-2 sm:py-3 px-4 sm:px-2 text-xs sm:text-sm text-gray-500 hidden md:table-cell">
-                              09:00
-                            </td>
-                            <td className="py-2 sm:py-3 px-4 sm:px-2 text-xs sm:text-sm text-gray-500 hidden md:table-cell">
-                              17:00
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-              
-              {/* Mobile view for attendance records - only shows on very small screens */}
-              {!isLoading && !error && attendanceRecords.length > 0 && (
-                <div className="sm:hidden mt-4">
-                  <div className="text-xs text-gray-500 mb-2">Swipe to see more →</div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right Column - Calendar and Tools */}
+          {/* Right Column */}
           <div className="w-full lg:w-1/3 space-y-4 lg:space-y-6">
             {/* Mark Attendance Tool */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">
@@ -416,47 +363,22 @@ const StudentDashboard = () => {
                   <User size={18} className="text-purple-600" />
                   <h2 className="font-semibold text-sm sm:text-base">Mark Attendance</h2>
                 </div>
-                {/* QR Code Scan Button */}
                 <button 
                   onClick={toggleQRScanner}
-                  className="bg-purple-100 hover:bg-purple-200 text-purple-700 p-2 rounded-full flex items-center justify-center transition-colors"
+                  className="bg-purple-100 hover:bg-purple-200 text-purple-700 p-2 rounded-full"
                 >
                   <QrCode size={18} />
                 </button>
               </div>
               
-              {/* QR Scanner */}
               {showQRScanner ? (
-                <div className="relative mb-4">
-                  <div className="bg-gray-50 rounded-lg overflow-hidden">
-                    <div className="p-4 text-center">
-                      <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Camera size={24} className="text-purple-600" />
-                      </div>
-                      <h3 className="text-sm font-medium text-gray-800 mb-1">Scan QR Code</h3>
-                      <p className="text-xs text-gray-500 mb-4">
-                        Position the QR code within the scanning area
-                      </p>
-                      
-                      {/* QR Scanner Component */}
-                      <QRScanner onScan={handleQRScan} />
-                      
-                      {/* Cancel Button */}
-                      <button 
-                        onClick={() => setShowQRScanner(false)}
-                        className="mt-4 text-sm text-purple-600 hover:text-purple-800"
-                      >
-                        Cancel Scan
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <QRScanner onScan={handleQRScan} />
               ) : (
                 <AttendanceForm onAttendanceMarked={handleAttendanceMarked} />
               )}
             </div>
             
-            {/* Blockchain Attendance Records */}
+            {/* Blockchain Attendance */}
             <BlockchainAttendance />
             
             {/* Wallet Section */}
@@ -465,16 +387,16 @@ const StudentDashboard = () => {
             </div>
           </div>
         </div>
-        
-        {/* Mobile Action Button */}
-        <div className="lg:hidden fixed bottom-6 right-6">
-          <button className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg flex items-center justify-center">
-            <User size={24} />
-          </button>
-        </div>
       </div>
       
-      {/* Add some CSS for animations */}
+      {/* Mobile Action Button */}
+      <div className="lg:hidden fixed bottom-6 right-6">
+        <button className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg flex items-center justify-center">
+          <User size={24} />
+        </button>
+      </div>
+      
+      {/* Animations */}
       <style jsx>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-10px); }

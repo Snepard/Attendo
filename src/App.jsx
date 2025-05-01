@@ -8,16 +8,19 @@ import Landing from './pages/Landing';
 
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentProfile from './pages/student/StudentProfile';
+import AttendanceRecords from './pages/student/AttendanceRecords';
+import Transcript from './pages/student/Transcript';
+import Reports from './pages/student/Reports';
+
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherStudentList from './pages/teacher/TeacherStudentList';
+import TeacherProfile from './pages/teacher/TeacherProfile';
 import FlippingAuthCard from './pages/FlippingAuthCard';
 
-import TeacherProfile from './pages/teacher/TeacherProfile';
 import { ProtectedRoute, TeacherRoute, StudentRoute } from './components/ProtectedRoute';
 import './App.css';
 
 function AppContent() {
-  // Use our layout context to control navbar and footer visibility
   const { showNavbar, showFooter } = useLayout();
   
   return (
@@ -34,6 +37,9 @@ function AppContent() {
           <Route element={<StudentRoute />}>
             <Route path="/student/dashboard" element={<StudentDashboard />} />
             <Route path="/student/profile" element={<StudentProfile />} />
+            <Route path="/student/attendance-records" element={<AttendanceRecords />} />
+            <Route path="/student/transcript" element={<Transcript />} />
+            <Route path="/student/reports" element={<Reports />} />
           </Route>
           
           {/* Teacher routes */}

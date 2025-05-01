@@ -19,11 +19,17 @@ const handleProviderError = (error) => {
   if (error.code === 'NETWORK_ERROR') {
     throw new Error('Please make sure you are connected to the Telos network');
   }
+  if (error.code === 'CALL_EXCEPTION') {
+    throw new Error('Contract interaction failed. Please try again.');
+  }
   throw error;
 };
 
 export const getContract = (provider) => {
   try {
+    if (!CONTRACT_ADDRESS) {
+      throw new Error('Contract address not configured');
+    }
     return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
   } catch (error) {
     handleProviderError(error);
