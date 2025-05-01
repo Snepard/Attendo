@@ -1,4 +1,4 @@
-#root {
+/* #root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
@@ -39,4 +39,47 @@
 
 .read-the-docs {
   color: #888;
+} */
+/* Enhanced CSS Reset - Add this to your App.css */
+
+/* More aggressive reset targeting all elements */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
+
+/* Ensure the HTML and body elements take up full width and height */
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Target the root element where React mounts */
+#root, #app, div[data-reactroot] {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Fix for Tailwind container classes */
+.container {
+  max-width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Force all sections to be full width */
+header, section, footer, main {
+  width: 100%;
+  max-width: 100vw;
+}
+
+/* Debugging - Uncomment to see element boundaries 
+* {
+  outline: 1px solid red;
+}
+*/
