@@ -286,7 +286,7 @@ export default function FlippingAuthCard() {
               )}
 
               {/* Role Toggle */}
-              <div className="flex mb-4">
+              <div className="flex mb-0.5">
                 <button
                   type="button"
                   onClick={() => setRole('student')}
