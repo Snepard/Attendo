@@ -11,6 +11,8 @@ import StudentDashboard from './pages/student/StudentDashboard';
 import StudentProfile from './pages/student/StudentProfile';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherStudentList from './pages/teacher/TeacherStudentList';
+import FlippingAuthCard from './pages/FlippingAuthCard';
+
 import TeacherProfile from './pages/teacher/TeacherProfile';
 import { ProtectedRoute, TeacherRoute, StudentRoute } from './components/ProtectedRoute';
 import './App.css';
@@ -26,8 +28,8 @@ function AppContent() {
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<SignUp />} />
+          <Route path="/login" element={<FlippingAuthCard />} />
+          <Route path="/signup" element={<FlippingAuthCard />} />
           
           {/* Student routes */}
           <Route element={<StudentRoute />}>
