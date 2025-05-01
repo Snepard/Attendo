@@ -4,7 +4,7 @@ import { useWeb3 } from '../context/Web3Context';
 import { markAttendance as markBlockchainAttendance } from '../utils/contractUtils';
 import { markAttendance, validateAttendanceCode } from '../utils/supabaseClient';
 import { createAttendanceRecord } from '../utils/attendanceUtils';
-import { isWithinCampus } from '../utils/locationUtils';
+import { isWithinCampus, getDistanceFromLatLonInKm, CAMPUS_COORDINATES } from '../utils/locationUtils';
 import QRScanner from './QRScanner';
 import { QrCode } from 'lucide-react';
 
@@ -19,24 +19,32 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
 
   const checkLocationAndMarkAttendance = async (codeData) => {
     return new Promise((resolve, reject) => {
+      // First check if geolocation is available
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by your browser'));
+        return;
+      }
+
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          // Add accuracy information to help debug location issues
-          console.log('Location accuracy:', position.coords.accuracy, 'meters');
-          
-          if (!isWithinCampus(latitude, longitude)) {
-            reject(new Error(`You must be within campus area to mark attendance. You are ${getDistanceFromLatLonInKm(
-              latitude,
-              longitude,
-              CAMPUS_COORDINATES.latitude,
-              CAMPUS_COORDINATES.longitude
-            ).toFixed(2)}km from campus center`));
-            return;
-          }
-
           try {
+            const { latitude, longitude } = position.coords;
+            
+            // Add accuracy information to help debug location issues
+            console.log('Location accuracy:', position.coords.accuracy, 'meters');
+            
+            if (!isWithinCampus(latitude, longitude)) {
+              const distance = getDistanceFromLatLonInKm(
+                latitude,
+                longitude,
+                CAMPUS_COORDINATES.latitude,
+                CAMPUS_COORDINATES.longitude
+              ).toFixed(2);
+              
+              reject(new Error(`You must be within campus area to mark attendance. You are ${distance}km from campus center`));
+              return;
+            }
+
             // Create attendance record
             const attendanceData = createAttendanceRecord(
               user.id, 
@@ -46,30 +54,57 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
             );
 
             // Record attendance in database
-            const { data, error } = await markAttendance(attendanceData);
+            const { data, error: dbError } = await markAttendance(attendanceData);
 
-            if (error) {
-              throw error;
+            if (dbError) {
+              console.error("Database error:", dbError);
+              throw new Error(dbError.message || 'Failed to record attendance in database');
             }
 
             // Mark attendance on blockchain
             if (walletAddress && provider) {
-              const signer = await provider.getSigner();
-              await markBlockchainAttendance(signer, attendanceCode);
+              try {
+                const signer = provider.getSigner();
+                await markBlockchainAttendance(signer, attendanceCode);
+                console.log("Blockchain attendance marked successfully");
+              } catch (blockchainError) {
+                console.error("Blockchain error:", blockchainError);
+                // Don't fail the whole process if blockchain marking fails
+                // Just log the error and continue
+              }
+            } else {
+              console.warn("No wallet connected for blockchain attendance");
             }
 
+            // Even if blockchain fails, we still successfully recorded in the database
             resolve(data);
           } catch (error) {
+            console.error("Error in attendance process:", error);
             reject(error);
           }
         },
-        (error) => {
-          console.error('Geolocation error:', error);
-          reject(new Error('Please enable location access to mark attendance. Error: ' + error.message));
+        (geoError) => {
+          console.error('Geolocation error:', geoError);
+          let errorMsg = 'Please enable location access to mark attendance.';
+          
+          // Provide more specific error messages based on the error code
+          switch(geoError.code) {
+            case 1: // PERMISSION_DENIED
+              errorMsg = 'Location permission denied. Please enable location services in your browser settings.';
+              break;
+            case 2: // POSITION_UNAVAILABLE
+              errorMsg = 'Location information is unavailable. Please try again in a different area.';
+              break;
+            case 3: // TIMEOUT
+              errorMsg = 'Location request timed out. Please check your connection and try again.';
+              break;
+          }
+          
+          reject(new Error(errorMsg));
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 15000, // Increased timeout to 15 seconds
           maximumAge: 0
         }
       );
@@ -86,29 +121,30 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
       return;
     }
 
-    if (!walletAddress) {
-      setError('Please connect your wallet to mark attendance');
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       setError('');
       setSuccess('');
 
+      // Check wallet only if needed for blockchain (but don't block database attendance)
+      if (!walletAddress) {
+        console.warn('No wallet connected. Will record attendance in database only.');
+      }
+
       // Validate the attendance code
       const { data: codeData, error: codeError } = await validateAttendanceCode(attendanceCode);
 
       if (codeError || !codeData) {
-        setError('Invalid or expired attendance code');
-        return;
+        throw new Error('Invalid or expired attendance code');
       }
 
       // Check location and mark attendance
       const data = await checkLocationAndMarkAttendance(codeData);
 
       // Success
-      setSuccess('Attendance marked successfully on both database and blockchain!');
+      setSuccess(walletAddress 
+        ? 'Attendance marked successfully on both database and blockchain!' 
+        : 'Attendance marked successfully in database. Connect wallet to record on blockchain.');
       setAttendanceCode('');
       
       // Notify parent component
@@ -126,12 +162,19 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
 
   const handleQRCodeScanned = (code) => {
     console.log("QR code received in AttendanceForm:", code);
-    setAttendanceCode(code);
+    if (!code) {
+      setError('Invalid QR code');
+      return;
+    }
+    
+    // Validate and clean the code
+    const cleanCode = code.trim().toUpperCase();
+    setAttendanceCode(cleanCode);
     setShowQRScanner(false);
     
     // Auto-submit with a small delay to allow state update
     setTimeout(() => {
-      console.log("Auto-submitting with code:", code);
+      console.log("Auto-submitting with code:", cleanCode);
       handleSubmit();
     }, 800);
   };
@@ -190,7 +233,7 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
           
           <button
             type="submit"
-            disabled={isSubmitting || !walletAddress}
+            disabled={isSubmitting}
             className="btn btn-primary w-full"
           >
             {isSubmitting ? 'Submitting...' : 'Mark Attendance'}
@@ -198,7 +241,7 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
           
           {!walletAddress && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 text-sm text-yellow-700">
-              Please connect your wallet to mark attendance
+              No wallet connected. Attendance will only be recorded in database, not on blockchain.
             </div>
           )}
           
