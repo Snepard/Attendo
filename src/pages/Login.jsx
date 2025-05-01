@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLayout } from '../context/LayoutContext';
 import loginImage from '../assets/login.jpg';
 
 
@@ -11,9 +12,16 @@ export default function LavenderLoginPage() {
   const [error, setError] = useState('');
   
   const { user, signIn, isStudent, isTeacher } = useAuth();
+  const { setShowFooter } = useLayout(); 
   const navigate = useNavigate();
   const location = useLocation();
   
+  useEffect(() => {
+    setShowFooter(false);
+    // Cleanup function - restore footer when component unmounts
+    return () => setShowFooter(true);
+  }, [setShowFooter]);
+
   // Check if user is already logged in and redirect accordingly
   useEffect(() => {
     if (user) {

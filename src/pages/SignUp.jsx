@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLayout } from '../context/LayoutContext';
 import signupImage from '../assets/signup.jpg';
 
 export default function LavenderSignupPage() {
@@ -15,7 +16,14 @@ export default function LavenderSignupPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const { user, signUp } = useAuth();
+  const { setShowFooter } = useLayout();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setShowFooter(false);
+    // Cleanup function - restore footer when component unmounts
+    return () => setShowFooter(true);
+  }, [setShowFooter]);
 
   useEffect(() => {
     if (user) {
