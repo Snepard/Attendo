@@ -6,7 +6,7 @@ import { markAttendance, validateAttendanceCode } from '../utils/supabaseClient'
 import { createAttendanceRecord } from '../utils/attendanceUtils';
 import { isWithinCampus, getDistanceFromLatLonInKm, CAMPUS_COORDINATES } from '../utils/locationUtils';
 import QRScanner from './QRScanner';
-import { QrCode } from 'lucide-react';
+import { QrCode, ExternalLink } from 'lucide-react';
 
 const AttendanceForm = ({ onAttendanceMarked }) => {
   const { user, profile } = useAuth();
@@ -16,10 +16,10 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [blockchainTxHash, setBlockchainTxHash] = useState('');
 
   const checkLocationAndMarkAttendance = async (codeData) => {
     return new Promise((resolve, reject) => {
-      // First check if geolocation is available
       if (!navigator.geolocation) {
         reject(new Error('Geolocation is not supported by your browser'));
         return;
@@ -30,7 +30,6 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
           try {
             const { latitude, longitude } = position.coords;
             
-            // Add accuracy information to help debug location issues
             console.log('Location accuracy:', position.coords.accuracy, 'meters');
             
             if (!isWithinCampus(latitude, longitude)) {
@@ -64,19 +63,19 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
             // Mark attendance on blockchain
             if (walletAddress && provider) {
               try {
-                const signer = provider.getSigner();
-                await markBlockchainAttendance(signer, attendanceCode);
-                console.log("Blockchain attendance marked successfully");
+                const signer = await provider.getSigner();
+                const tx = await markBlockchainAttendance(signer, attendanceCode);
+                await tx.wait(); // Wait for transaction confirmation
+                setBlockchainTxHash(tx.hash);
+                console.log("Blockchain attendance marked successfully:", tx.hash);
               } catch (blockchainError) {
                 console.error("Blockchain error:", blockchainError);
-                // Don't fail the whole process if blockchain marking fails
-                // Just log the error and continue
+                throw new Error('Failed to record attendance on blockchain. Please try again.');
               }
             } else {
               console.warn("No wallet connected for blockchain attendance");
             }
 
-            // Even if blockchain fails, we still successfully recorded in the database
             resolve(data);
           } catch (error) {
             console.error("Error in attendance process:", error);
@@ -87,15 +86,14 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
           console.error('Geolocation error:', geoError);
           let errorMsg = 'Please enable location access to mark attendance.';
           
-          // Provide more specific error messages based on the error code
           switch(geoError.code) {
-            case 1: // PERMISSION_DENIED
+            case 1:
               errorMsg = 'Location permission denied. Please enable location services in your browser settings.';
               break;
-            case 2: // POSITION_UNAVAILABLE
+            case 2:
               errorMsg = 'Location information is unavailable. Please try again in a different area.';
               break;
-            case 3: // TIMEOUT
+            case 3:
               errorMsg = 'Location request timed out. Please check your connection and try again.';
               break;
           }
@@ -104,7 +102,7 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
         },
         {
           enableHighAccuracy: true,
-          timeout: 15000, // Increased timeout to 15 seconds
+          timeout: 15000,
           maximumAge: 0
         }
       );
@@ -121,36 +119,29 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
       return;
     }
 
+    if (!walletAddress) {
+      setError('Please connect your wallet to mark attendance');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError('');
       setSuccess('');
+      setBlockchainTxHash('');
 
-      // Check wallet only if needed for blockchain (but don't block database attendance)
-      if (!walletAddress) {
-        console.warn('No wallet connected. Will record attendance in database only.');
-      }
-
-      // Validate the attendance code
       const { data: codeData, error: codeError } = await validateAttendanceCode(attendanceCode);
 
       if (codeError || !codeData) {
         throw new Error('Invalid or expired attendance code');
       }
 
-      // Check location and mark attendance
       const data = await checkLocationAndMarkAttendance(codeData);
 
-      // Success
-      setSuccess(walletAddress 
-        ? 'Attendance marked successfully on both database and blockchain!' 
-        : 'Attendance marked successfully in database. Connect wallet to record on blockchain.');
+      setSuccess('Attendance marked successfully!');
       setAttendanceCode('');
       
-      // Notify parent component
       if (onAttendanceMarked) onAttendanceMarked(data);
-      
-      // Hide QR scanner if it was open
       setShowQRScanner(false);
     } catch (error) {
       console.error('Error marking attendance:', error);
@@ -161,20 +152,16 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
   };
 
   const handleQRCodeScanned = (code) => {
-    console.log("QR code received in AttendanceForm:", code);
     if (!code) {
       setError('Invalid QR code');
       return;
     }
     
-    // Validate and clean the code
     const cleanCode = code.trim().toUpperCase();
     setAttendanceCode(cleanCode);
     setShowQRScanner(false);
     
-    // Auto-submit with a small delay to allow state update
     setTimeout(() => {
-      console.log("Auto-submitting with code:", cleanCode);
       handleSubmit();
     }, 800);
   };
@@ -185,17 +172,9 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
       
       {showQRScanner ? (
         <div className="mb-4">
-          <QRScanner 
-            onScan={(code) => {
-              console.log("QR Code detected:", code);
-              handleQRCodeScanned(code);
-            }} 
-          />
+          <QRScanner onScan={handleQRCodeScanned} />
           <button 
-            onClick={() => {
-              console.log("Cancelling QR scanner");
-              setShowQRScanner(false);
-            }}
+            onClick={() => setShowQRScanner(false)}
             className="btn btn-secondary w-full mt-2"
           >
             Cancel Scan
@@ -219,10 +198,7 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
               />
               <button
                 type="button"
-                onClick={() => {
-                  console.log("Opening QR scanner");
-                  setShowQRScanner(true);
-                }}
+                onClick={() => setShowQRScanner(true)}
                 className="btn btn-secondary px-3"
                 aria-label="Scan QR Code"
               >
@@ -233,15 +209,15 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
           
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !walletAddress}
             className="btn btn-primary w-full"
           >
-            {isSubmitting ? 'Submitting...' : 'Mark Attendance'}
+            {isSubmitting ? 'Marking Attendance...' : 'Mark Attendance'}
           </button>
           
           {!walletAddress && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 text-sm text-yellow-700">
-              No wallet connected. Attendance will only be recorded in database, not on blockchain.
+              Please connect your wallet to mark attendance
             </div>
           )}
           
@@ -254,6 +230,20 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
           {success && (
             <div className="bg-green-50 border-l-4 border-green-400 p-3 text-sm text-green-700">
               {success}
+              {blockchainTxHash && (
+                <div className="mt-2">
+                  <p className="font-medium">Blockchain Transaction:</p>
+                  <a
+                    href={`https://testnet.teloscan.io/tx/${blockchainTxHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-600 hover:text-green-800 flex items-center mt-1"
+                  >
+                    View on Explorer
+                    <ExternalLink size={14} className="ml-1" />
+                  </a>
+                </div>
+              )}
             </div>
           )}
         </form>

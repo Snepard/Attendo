@@ -14,8 +14,8 @@ const CONTRACT_ABI = [
   "event CodeUpdated(bytes32 indexed codeHash, uint256 expiry)"
 ];
 
-// Helper function to handle provider errors
 const handleProviderError = (error) => {
+  console.error('Provider error:', error);
   if (error.code === 'NETWORK_ERROR') {
     throw new Error('Please make sure you are connected to the Telos network');
   }
@@ -34,8 +34,8 @@ export const updateAttendanceCode = async (signer, code, validityInMinutes) => {
   try {
     const contract = getContract(signer);
     const tx = await contract.updateAttendanceCode(code, validityInMinutes);
-    await tx.wait();
-    return tx;
+    const receipt = await tx.wait();
+    return receipt;
   } catch (error) {
     handleProviderError(error);
   }
@@ -45,9 +45,11 @@ export const markAttendance = async (signer, code) => {
   try {
     const contract = getContract(signer);
     const tx = await contract.markAttendance(code);
-    await tx.wait();
     return tx;
   } catch (error) {
+    if (error.message.includes('already marked')) {
+      throw new Error('You have already marked attendance for this session');
+    }
     handleProviderError(error);
   }
 };
@@ -55,8 +57,10 @@ export const markAttendance = async (signer, code) => {
 export const checkAttendanceStatus = async (provider, address) => {
   try {
     const contract = getContract(provider);
-    const hasMarked = await contract.hasMarkedAttendance(address);
-    const count = await contract.getAttendanceCount(address);
+    const [hasMarked, count] = await Promise.all([
+      contract.hasMarkedAttendance(address),
+      contract.getAttendanceCount(address)
+    ]);
     return { hasMarked, count };
   } catch (error) {
     handleProviderError(error);
