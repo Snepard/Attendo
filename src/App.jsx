@@ -5,8 +5,7 @@ import { LayoutProvider, useLayout } from './context/LayoutContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Landing from './pages/Landing';
-import Login from './pages/Login';
-import SignUp from './pages/SignUp';
+
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentProfile from './pages/student/StudentProfile';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
