@@ -90,15 +90,27 @@ const StudentProfile = () => {
       setShowPhotoOptions(false);
       setShowCameraModal(true);
       
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: "user" },
+      // Specify constraints for mobile-friendly capture
+      const constraints = { 
+        video: { 
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false 
-      });
+      };
       
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setCameraStream(stream);
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        // Ensure video is playing before capture
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current.play().catch(e => {
+            console.error("Error playing video:", e);
+          });
+        };
       }
     } catch (err) {
       console.error("Error accessing camera:", err);
@@ -111,29 +123,39 @@ const StudentProfile = () => {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
-      // Set canvas dimensions to match video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      // Draw video frame to canvas
-      const context = canvas.getContext('2d');
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Convert canvas to blob
-      canvas.toBlob((blob) => {
-        if (blob) {
-          // Create a file from the blob
-          const file = new File([blob], "camera-capture.jpg", { type: "image/jpeg" });
-          setProfilePhoto(file);
-          
-          // Create preview URL
-          const imageUrl = URL.createObjectURL(blob);
-          setPhotoPreview(imageUrl);
-          
-          // Close camera modal and stop stream
-          closeCamera();
-        }
-      }, 'image/jpeg', 0.95);
+      try {
+        // Set canvas dimensions to match video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Draw video frame to canvas
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert canvas to blob without using potentially problematic methods
+        canvas.toBlob((blob) => {
+          if (blob) {
+            // Create a file from the blob with a unique timestamp
+            const timestamp = new Date().getTime();
+            const file = new File([blob], `profile-photo-${timestamp}.jpg`, { 
+              type: "image/jpeg",
+              lastModified: timestamp
+            });
+            
+            setProfilePhoto(file);
+            
+            // Create preview URL safely
+            const imageUrl = URL.createObjectURL(blob);
+            setPhotoPreview(imageUrl);
+            
+            // Close camera modal and stop stream
+            closeCamera();
+          }
+        }, 'image/jpeg', 0.9); // Slightly lower quality for better performance
+      } catch (err) {
+        console.error("Error capturing photo:", err);
+        setError("Failed to capture photo. Please try again.");
+      }
     }
   };
   
@@ -544,12 +566,16 @@ const StudentProfile = () => {
       {/* Camera Modal */}
       {showCameraModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden max-w-lg w-full">
-            <div className="p-4 bg-purple-600 text-white flex justify-between items-center">
-              <h3 className="font-medium">Take Profile Photo</h3>
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden max-w-lg w-full mx-4">
+            <div className="p-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex justify-between items-center">
+              <h3 className="font-medium flex items-center">
+                <Camera size={18} className="mr-2" />
+                Take Profile Photo
+              </h3>
               <button 
                 onClick={closeCamera} 
-                className="text-white hover:text-purple-200"
+                className="text-white hover:text-purple-200 focus:outline-none"
+                aria-label="Close camera"
               >
                 <X size={20} />
               </button>
@@ -559,17 +585,29 @@ const StudentProfile = () => {
               <div className="relative bg-black rounded-lg overflow-hidden mb-4">
                 <video 
                   ref={videoRef} 
-                  autoPlay 
+                  autoPlay
+                  muted
                   playsInline 
                   className="w-full h-64 object-cover"
                 />
                 <canvas ref={canvasRef} className="hidden" />
+                
+                {/* Camera loading overlay */}
+                {!cameraStream && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 text-white">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white mx-auto mb-2"></div>
+                      <p>Accessing camera...</p>
+                    </div>
+                  </div>
+                )}
               </div>
               
-              <div className="flex justify-center space-x-4">
+              <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
                 <button 
                   onClick={capturePhoto}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md flex items-center"
+                  disabled={!cameraStream}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-md flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Camera size={16} className="mr-2" />
                   Capture Photo
@@ -581,6 +619,10 @@ const StudentProfile = () => {
                   Cancel
                 </button>
               </div>
+              
+              <p className="mt-4 text-xs text-gray-500 text-center">
+                Position your face in the center of the frame and ensure good lighting
+              </p>
             </div>
           </div>
         </div>
