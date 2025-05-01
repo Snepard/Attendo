@@ -31,7 +31,7 @@ const Navbar = () => {
         <div className="flex justify-between items-center">
           <Link to={user ? (isStudent ? '/student/dashboard' : '/teacher/dashboard') : '/'} className="text-xl font-bold text-primary-500 flex items-center">
             <img 
-              src="/logo.jpeg" 
+              src="/logo.png" 
               alt="Attendo" 
               className="h-9" 
             />
