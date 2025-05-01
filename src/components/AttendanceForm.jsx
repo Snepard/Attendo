@@ -23,8 +23,16 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
         async (position) => {
           const { latitude, longitude } = position.coords;
           
+          // Add accuracy information to help debug location issues
+          console.log('Location accuracy:', position.coords.accuracy, 'meters');
+          
           if (!isWithinCampus(latitude, longitude)) {
-            reject(new Error('You must be within campus area to mark attendance'));
+            reject(new Error(`You must be within campus area to mark attendance. You are ${getDistanceFromLatLonInKm(
+              latitude,
+              longitude,
+              CAMPUS_COORDINATES.latitude,
+              CAMPUS_COORDINATES.longitude
+            ).toFixed(2)}km from campus center`));
             return;
           }
 
@@ -56,11 +64,12 @@ const AttendanceForm = ({ onAttendanceMarked }) => {
           }
         },
         (error) => {
-          reject(new Error('Please enable location access to mark attendance'));
+          console.error('Geolocation error:', error);
+          reject(new Error('Please enable location access to mark attendance. Error: ' + error.message));
         },
         {
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000,
           maximumAge: 0
         }
       );
