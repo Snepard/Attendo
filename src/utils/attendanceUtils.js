@@ -8,21 +8,6 @@ export const generateUniqueCode = () => {
   return code;
 };
 
-// Validate attendance code with timestamp
-export const validateAttendanceCode = (code) => {
-  if (!code) return false;
-  
-  const [baseCode, timestamp] = code.split('-');
-  if (!baseCode || !timestamp) return false;
-  
-  const codeTime = parseInt(timestamp);
-  const now = Date.now();
-  const timeDiff = now - codeTime;
-  
-  // Code must be less than 7 seconds old
-  return timeDiff <= 7000;
-};
-
 // Format date for display
 export const formatDate = (dateString) => {
   try {
