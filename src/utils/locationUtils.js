@@ -29,6 +29,9 @@ export const isWithinCampus = (latitude, longitude) => {
   console.log('Current location:', { latitude, longitude });
   console.log('Campus location:', CAMPUS_COORDINATES);
   
+  // Add some tolerance to account for GPS inaccuracy
+  const GPS_ACCURACY_BUFFER = 0.2; // Adding 200 meters tolerance
+  
   const distance = getDistanceFromLatLonInKm(
     latitude,
     longitude,
@@ -38,7 +41,8 @@ export const isWithinCampus = (latitude, longitude) => {
   
   // Log the calculated distance
   console.log('Distance from campus:', distance, 'km');
-  console.log('Allowed radius:', CAMPUS_COORDINATES.radius, 'km');
+  console.log('Allowed radius:', CAMPUS_COORDINATES.radius + GPS_ACCURACY_BUFFER, 'km');
   
-  return distance <= CAMPUS_COORDINATES.radius;
+  // Return true with added buffer for GPS inaccuracy
+  return distance <= (CAMPUS_COORDINATES.radius + GPS_ACCURACY_BUFFER);
 };
