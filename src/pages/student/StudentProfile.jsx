@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useWeb3 } from '../../context/Web3Context';
-import { User, Calendar, Mail, FileText, Clock, Award, Edit2, Save, X } from 'lucide-react';
+import { User, Calendar, Mail, FileText, Clock, Award, Edit2, Save, X, Camera, Upload, Trash } from 'lucide-react';
 
 const StudentProfile = () => {
   const { user, profile, updateProfile } = useAuth();
   const { walletAddress, formatAddress } = useWeb3();
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   
   const [formData, setFormData] = useState({
     first_name: '',
@@ -15,10 +17,17 @@ const StudentProfile = () => {
     bio: '',
   });
   
+  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [cameraStream, setCameraStream] = useState(null);
   
   // Initialize form data with profile data
   useEffect(() => {
@@ -30,12 +39,141 @@ const StudentProfile = () => {
         email: user?.email || '',
         bio: profile.bio || '',
       });
+      
+      // Set profile photo if it exists
+      if (profile.photo_url) {
+        setPhotoPreview(profile.photo_url);
+      }
     }
   }, [profile, user]);
 
+  // Clean up camera stream when component unmounts or modal closes
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
+  // Stop camera when modal is closed
+  useEffect(() => {
+    if (!showCameraModal && cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+  }, [showCameraModal, cameraStream]);
+  
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfilePhoto(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+      
+      setShowPhotoOptions(false);
+    }
+  };
+  
+  const openCamera = async () => {
+    try {
+      setShowPhotoOptions(false);
+      setShowCameraModal(true);
+      
+      // Specify constraints for mobile-friendly capture
+      const constraints = { 
+        video: { 
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false 
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setCameraStream(stream);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        // Ensure video is playing before capture
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current.play().catch(e => {
+            console.error("Error playing video:", e);
+          });
+        };
+      }
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      setError("Could not access camera. Please check permissions.");
+    }
+  };
+  
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      try {
+        // Set canvas dimensions to match video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Draw video frame to canvas
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert canvas to blob without using potentially problematic methods
+        canvas.toBlob((blob) => {
+          if (blob) {
+            // Create a file from the blob with a unique timestamp
+            const timestamp = new Date().getTime();
+            const file = new File([blob], `profile-photo-${timestamp}.jpg`, { 
+              type: "image/jpeg",
+              lastModified: timestamp
+            });
+            
+            setProfilePhoto(file);
+            
+            // Create preview URL safely
+            const imageUrl = URL.createObjectURL(blob);
+            setPhotoPreview(imageUrl);
+            
+            // Close camera modal and stop stream
+            closeCamera();
+          }
+        }, 'image/jpeg', 0.9); // Slightly lower quality for better performance
+      } catch (err) {
+        console.error("Error capturing photo:", err);
+        setError("Failed to capture photo. Please try again.");
+      }
+    }
+  };
+  
+  const closeCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setShowCameraModal(false);
+  };
+  
+  const removePhoto = () => {
+    setProfilePhoto(null);
+    setPhotoPreview(null);
+  };
+  
+  const triggerFileInput = () => {
+    fileInputRef.current.click();
   };
 
   const handleSubmit = async (e) => {
@@ -46,12 +184,18 @@ const StudentProfile = () => {
       setError('');
       setSuccess('');
       
+      // Create form data for API request
+      const uploadData = new FormData();
+      uploadData.append('first_name', formData.first_name);
+      uploadData.append('last_name', formData.last_name);
+      uploadData.append('bio', formData.bio);
+      
+      if (profilePhoto) {
+        uploadData.append('profile_photo', profilePhoto);
+      }
+      
       // Update profile
-      await updateProfile({
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        bio: formData.bio,
-      });
+      await updateProfile(uploadData);
       
       setSuccess('Profile updated successfully');
       setIsEditing(false);
@@ -81,9 +225,81 @@ const StudentProfile = () => {
                   </button>
                 )}
                 <div className="flex flex-col sm:flex-row items-center sm:items-start">
-                  <div className="h-24 w-24 rounded-full bg-white text-purple-600 flex items-center justify-center text-3xl font-bold mb-4 sm:mb-0 sm:mr-6 shadow-lg">
-                    {profile?.first_name?.[0] || user?.email?.[0]?.toUpperCase()}
-                  </div>
+                  {isEditing ? (
+                    <div className="relative">
+                      <div 
+                        className="h-24 w-24 rounded-full bg-white overflow-hidden mb-4 sm:mb-0 sm:mr-6 shadow-lg relative"
+                        onClick={() => setShowPhotoOptions(!showPhotoOptions)}
+                      >
+                        {photoPreview ? (
+                          <img 
+                            src={photoPreview} 
+                            alt="Profile Preview" 
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-purple-600 text-3xl font-bold">
+                            {profile?.first_name?.[0] || user?.email?.[0]?.toUpperCase()}
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
+                          <Camera size={24} className="text-white" />
+                        </div>
+                      </div>
+                      
+                      {/* Hidden file input */}
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        onChange={handlePhotoUpload}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      
+                      {/* Photo options dropdown */}
+                      {showPhotoOptions && (
+                        <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                          <div className="py-1">
+                            <button
+                              onClick={triggerFileInput}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                            >
+                              <Upload size={16} className="mr-2 text-purple-500" />
+                              Upload from device
+                            </button>
+                            <button
+                              onClick={openCamera}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                            >
+                              <Camera size={16} className="mr-2 text-purple-500" />
+                              Take photo
+                            </button>
+                            {photoPreview && (
+                              <button
+                                onClick={removePhoto}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
+                              >
+                                <Trash size={16} className="mr-2" />
+                                Remove photo
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="h-24 w-24 rounded-full overflow-hidden bg-white text-purple-600 flex items-center justify-center text-3xl font-bold mb-4 sm:mb-0 sm:mr-6 shadow-lg">
+                      {photoPreview ? (
+                        <img 
+                          src={photoPreview} 
+                          alt="Profile" 
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        profile?.first_name?.[0] || user?.email?.[0]?.toUpperCase()
+                      )}
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-2xl font-bold">
                       {profile?.first_name} {profile?.last_name}
@@ -292,13 +508,13 @@ const StudentProfile = () => {
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-xs text-gray-500">Profile Completion</span>
                     <span className="text-xs font-medium text-purple-600">
-                      {profile?.bio ? '100%' : '80%'}
+                      {photoPreview && profile?.bio ? '100%' : photoPreview || profile?.bio ? '90%' : '80%'}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-gradient-to-r from-purple-600 to-indigo-600 h-2 rounded-full" 
-                      style={{ width: profile?.bio ? '100%' : '80%' }}
+                      style={{ width: photoPreview && profile?.bio ? '100%' : photoPreview || profile?.bio ? '90%' : '80%' }}
                     ></div>
                   </div>
                 </div>
@@ -346,6 +562,71 @@ const StudentProfile = () => {
           </div>
         </div>
       </div>
+      
+      {/* Camera Modal */}
+      {showCameraModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden max-w-lg w-full mx-4">
+            <div className="p-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex justify-between items-center">
+              <h3 className="font-medium flex items-center">
+                <Camera size={18} className="mr-2" />
+                Take Profile Photo
+              </h3>
+              <button 
+                onClick={closeCamera} 
+                className="text-white hover:text-purple-200 focus:outline-none"
+                aria-label="Close camera"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-4">
+              <div className="relative bg-black rounded-lg overflow-hidden mb-4">
+                <video 
+                  ref={videoRef} 
+                  autoPlay
+                  muted
+                  playsInline 
+                  className="w-full h-64 object-cover"
+                />
+                <canvas ref={canvasRef} className="hidden" />
+                
+                {/* Camera loading overlay */}
+                {!cameraStream && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 text-white">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white mx-auto mb-2"></div>
+                      <p>Accessing camera...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <button 
+                  onClick={capturePhoto}
+                  disabled={!cameraStream}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-md flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Camera size={16} className="mr-2" />
+                  Capture Photo
+                </button>
+                <button 
+                  onClick={closeCamera}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md"
+                >
+                  Cancel
+                </button>
+              </div>
+              
+              <p className="mt-4 text-xs text-gray-500 text-center">
+                Position your face in the center of the frame and ensure good lighting
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
