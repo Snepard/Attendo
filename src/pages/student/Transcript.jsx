@@ -1,17 +1,59 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, FileText, Calendar } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { generateTranscript, downloadPDF } from '../../utils/downloadUtils';
+import { getStudentAttendance } from '../../utils/supabaseClient';
 
 const Transcript = () => {
+  const { user, profile } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchAttendance = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await getStudentAttendance(user.id);
+        if (error) throw error;
+        setAttendanceRecords(data || []);
+      } catch (error) {
+        console.error('Error fetching attendance:', error);
+        setError('Failed to load attendance records');
+      }
+    };
+    
+    fetchAttendance();
+  }, [user]);
 
   const handleDownload = async () => {
-    setIsGenerating(true);
-    // Simulate download delay
-    setTimeout(() => {
+    try {
+      setIsGenerating(true);
+      
+      // Group attendance by course
+      const courseStats = attendanceRecords.reduce((acc, record) => {
+        if (!acc[record.course_id]) {
+          acc[record.course_id] = {
+            name: record.course_name,
+            code: record.course_code,
+            present: 0,
+            total: 0
+          };
+        }
+        acc[record.course_id].total++;
+        if (!record.is_late) acc[record.course_id].present++;
+        return acc;
+      }, {});
+
+      const doc = generateTranscript(profile, Object.values(courseStats), courseStats);
+      downloadPDF(doc, `transcript_${new Date().toISOString()}.pdf`);
+    } catch (error) {
+      console.error('Error generating transcript:', error);
+      setError('Failed to generate transcript');
+    } finally {
       setIsGenerating(false);
-      // Here you would normally trigger the actual download
-      alert('Transcript download feature will be implemented soon!');
-    }, 2000);
+    }
   };
 
   return (
@@ -25,10 +67,16 @@ const Transcript = () => {
               Download your official academic transcript with attendance records and course details.
             </p>
 
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-400 p-4 text-sm text-red-700 mb-4">
+                {error}
+              </div>
+            )}
+
             <div className="space-y-4">
               <button
                 onClick={handleDownload}
-                disabled={isGenerating}
+                disabled={isGenerating || attendanceRecords.length === 0}
                 className="w-full sm:w-auto bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isGenerating ? (
@@ -54,7 +102,13 @@ const Transcript = () => {
                 <Calendar className="text-purple-600 mb-2" size={24} />
                 <h3 className="font-semibold mb-2">Attendance Summary</h3>
                 <p className="text-sm text-gray-600">
-                  View your complete attendance history and performance metrics.
+                  Total Classes: {attendanceRecords.length}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Present: {attendanceRecords.filter(r => !r.is_late).length}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Late: {attendanceRecords.filter(r => r.is_late).length}
                 </p>
               </div>
 
@@ -62,14 +116,14 @@ const Transcript = () => {
                 <FileText className="text-purple-600 mb-2" size={24} />
                 <h3 className="font-semibold mb-2">Course Details</h3>
                 <p className="text-sm text-gray-600">
-                  Access detailed information about your enrolled courses and academic progress.
+                  Includes detailed information about your enrolled courses and academic progress.
                 </p>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </div> 
   );
 };
 

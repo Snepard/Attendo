@@ -2,13 +2,37 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getStudentAttendance } from '../../utils/supabaseClient';
 import { Calendar, Download, FileText, Search } from 'lucide-react';
+import { generateAttendanceReport, downloadPDF } from '../../utils/downloadUtils';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const AttendanceRecords = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     const fetchAttendance = async () => {
@@ -41,6 +65,60 @@ const AttendanceRecords = () => {
     new Date(record.created_at).toLocaleDateString().includes(searchTerm)
   );
 
+  const handleDownloadReport = () => {
+    try {
+      setIsDownloading(true);
+      const doc = generateAttendanceReport(attendanceRecords, profile);
+      downloadPDF(doc, `attendance_report_${new Date().toISOString()}.pdf`);
+    } catch (error) {
+      console.error('Error generating report:', error);
+      setError('Failed to generate report');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  // Prepare data for the attendance chart
+  const chartData = {
+    labels: attendanceRecords.slice(-10).map(record => 
+      new Date(record.created_at).toLocaleDateString()
+    ),
+    datasets: [
+      {
+        label: 'Attendance',
+        data: attendanceRecords.slice(-10).map(record => record.is_late ? 0.5 : 1),
+        borderColor: 'rgb(75, 192, 192)',
+        tension: 0.1
+      }
+    ]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: 'Recent Attendance Pattern'
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 1,
+        ticks: {
+          callback: function(value) {
+            if (value === 1) return 'Present';
+            if (value === 0.5) return 'Late';
+            if (value === 0) return 'Absent';
+          }
+        }
+      }
+    }
+  };
+
   return (
     <div className="bg-purple-100 min-h-screen py-8">
       <div className="container mx-auto px-4">
@@ -58,11 +136,20 @@ const AttendanceRecords = () => {
                 />
                 <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
               </div>
-              <button className="bg-purple-100 text-purple-600 px-4 py-2 rounded-lg hover:bg-purple-200 transition-colors flex items-center">
+              <button 
+                className="bg-purple-100 text-purple-600 px-4 py-2 rounded-lg hover:bg-purple-200 transition-colors flex items-center"
+                onClick={handleDownloadReport}
+                disabled={isDownloading || attendanceRecords.length === 0}
+              >
                 <Download size={18} className="mr-2" />
-                Export
+                {isDownloading ? 'Generating...' : 'Export'}
               </button>
             </div>
+          </div>
+
+          {/* Attendance Chart */}
+          <div className="mb-8 bg-white p-4 rounded-lg shadow">
+            <Line data={chartData} options={chartOptions} />
           </div>
 
           {isLoading ? (
@@ -87,8 +174,8 @@ const AttendanceRecords = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time In</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -110,10 +197,10 @@ const AttendanceRecords = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(record.created_at).toLocaleTimeString()}
+                        {new Date(record.time_in).toLocaleTimeString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {record.location || 'Campus'}
+                        {record.time_out ? new Date(record.time_out).toLocaleTimeString() : '-'}
                       </td>
                     </tr>
                   ))}
