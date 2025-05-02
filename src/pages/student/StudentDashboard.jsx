@@ -1,8 +1,31 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getStudentAttendance } from '../../utils/supabaseClient';
-import { Bell, Calendar, FileText, Settings, Search, Download, BarChart2, Clock, Award, User, Menu, X, QrCode, Camera } from 'lucide-react';
+import { getStudentAttendance, getStudentAssignments, submitHomework } from '../../utils/supabaseClient';
+import { 
+  Home, FileText, ClipboardList, User, Calendar, 
+  Menu, X, QrCode, Plus, Check, Clock, Download, Video
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 // Reusing existing components
 import WalletConnect from '../../components/WalletConnect';
@@ -13,15 +36,38 @@ import QRScanner from '../../components/QRScanner';
 const StudentDashboard = () => {
   const { user, profile } = useAuth();
   const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [dateRange, setDateRange] = useState({ 
-    start: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), 
-    end: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
-  });
+  const [assignmentsError, setAssignmentsError] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
-  const [totalClasses, setTotalClasses] = useState(30); // Total expected classes
+  const [totalClasses, setTotalClasses] = useState(30);
+  const [todos, setTodos] = useState([]);
+  const [newTodo, setNewTodo] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showSubmissionForm, setShowSubmissionForm] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [submissionText, setSubmissionText] = useState('');
+
+  // Get current time for greeting
+  const currentHour = new Date().getHours();
+  const greeting = currentHour < 12 ? 'Good morning' : 
+                  currentHour < 18 ? 'Good afternoon' : 'Good evening';
+
+  // Load todos from localStorage on component mount
+  useEffect(() => {
+    const savedTodos = localStorage.getItem('studentTodos');
+    if (savedTodos) {
+      setTodos(JSON.parse(savedTodos));
+    }
+  }, []);
+
+  // Save todos to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('studentTodos', JSON.stringify(todos));
+  }, [todos]);
 
   // Get current date for calendar
   const currentDate = new Date();
@@ -55,6 +101,121 @@ const StudentDashboard = () => {
     fetchAttendance();
   }, [user]);
 
+  // Fetch assignments
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      if (!user) return;
+      
+      try {
+        setAssignmentsLoading(true);
+        setAssignmentsError('');
+        
+        const { data, error } = await getStudentAssignments(user.id);
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        setAssignments(data || []);
+      } catch (error) {
+        console.error('Error fetching assignments:', error);
+        setAssignmentsError('Failed to load assignments');
+      } finally {
+        setAssignmentsLoading(false);
+      }
+    };
+    
+    fetchAssignments();
+  }, [user]);
+
+  // Prepare chart data with dates on x-axis
+  const prepareChartData = () => {
+    // Group attendance by date
+    const attendanceByDate = {};
+    
+    attendanceRecords.forEach(record => {
+      const date = new Date(record.date).toLocaleDateString();
+      if (!attendanceByDate[date]) {
+        attendanceByDate[date] = {
+          present: 0,
+          late: 0
+        };
+      }
+      
+      if (record.is_late) {
+        attendanceByDate[date].late += 1;
+      } else {
+        attendanceByDate[date].present += 1;
+      }
+    });
+
+    // Sort dates chronologically
+    const sortedDates = Object.keys(attendanceByDate).sort((a, b) => {
+      return new Date(a) - new Date(b);
+    });
+
+    return {
+      labels: sortedDates,
+      datasets: [
+        {
+          label: 'Present',
+          data: sortedDates.map(date => attendanceByDate[date].present),
+          backgroundColor: 'rgba(75, 192, 192, 0.6)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1
+        },
+        {
+          label: 'Late',
+          data: sortedDates.map(date => attendanceByDate[date].late),
+          backgroundColor: 'rgba(255, 206, 86, 0.6)',
+          borderColor: 'rgba(255, 206, 86, 1)',
+          borderWidth: 1
+        }
+      ]
+    };
+  };
+
+  const chartData = prepareChartData();
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: 'Attendance by Date'
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            return `${context.dataset.label}: ${context.raw}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        title: {
+          display: true,
+          text: 'Date'
+        }
+      },
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Count'
+        },
+        ticks: {
+          stepSize: 1,
+          precision: 0
+        }
+      }
+    }
+  };
+
   // Handle when new attendance is marked
   const handleAttendanceMarked = (newAttendance) => {
     setAttendanceRecords([newAttendance, ...attendanceRecords]);
@@ -66,13 +227,13 @@ const StudentDashboard = () => {
     setShowQRScanner(false);
   };
 
-  // Calculate attendance stats based on actual records
+  // Calculate attendance stats
   const getAttendanceStats = () => {
     if (!attendanceRecords.length) return { present: 0, late: 0, absent: 0 };
     
     const present = attendanceRecords.filter(r => !r.is_late).length;
     const late = attendanceRecords.filter(r => r.is_late).length;
-    const total = totalClasses; // Using total expected classes
+    const total = totalClasses;
     
     return {
       present: Math.round((present / total) * 100),
@@ -83,38 +244,42 @@ const StudentDashboard = () => {
 
   const stats = getAttendanceStats();
 
-  // Monthly attendance stats (mock data based on records)
-  const getMonthlyStats = () => {
-    const total = attendanceRecords.length;
-    return {
-      onTime: Math.round((attendanceRecords.filter(r => !r.is_late).length / total) * 100) || 0,
-      late: Math.round((attendanceRecords.filter(r => r.is_late).length / total) * 100) || 0,
-      absent: 100 - (Math.round((attendanceRecords.length / 30) * 100) || 0)
-    };
+  // Todo list functions
+  const addTodo = () => {
+    if (newTodo.trim() === '') return;
+    setTodos([...todos, { id: Date.now(), text: newTodo, completed: false }]);
+    setNewTodo('');
   };
 
-  // Calculate employment status (mock data)
-  const employmentStats = {
-    contract: { count: 2, percentage: 15 },
-    fullTime: { count: 8, percentage: 60 },
-    partTime: { count: 3, percentage: 25 }
+  const toggleTodo = (id) => {
+    setTodos(todos.map(todo => 
+      todo.id === id ? { ...todo, completed: !todo.completed } : todo
+    ));
   };
 
-  // Mock upcoming schedule
-  const upcomingEvents = [
-    { title: "Course Assignment", time: "10:00 AM", icon: "📚" },
-    { title: "Group Project Meeting", time: "01:00 PM", icon: "👥" },
-    { title: "Academic Counseling", time: "03:00 PM", icon: "🎓" }
-  ];
+  const deleteTodo = (id) => {
+    setTodos(todos.filter(todo => todo.id !== id));
+  };
 
-  // Generate month days for calendar
+  // Generate calendar days
   const generateCalendarDays = () => {
     const days = [];
-    for (let i = 12; i <= 18; i++) {
+    const today = new Date().getDate();
+    const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+    
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+    
+    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+    for (let i = 1; i <= daysInMonth; i++) {
       days.push(i);
     }
-    return days;
+    
+    return { days, today };
   };
+
+  const { days, today } = generateCalendarDays();
 
   // Toggle mobile menu
   const toggleMobileMenu = () => {
@@ -126,8 +291,81 @@ const StudentDashboard = () => {
     setShowQRScanner(!showQRScanner);
   };
 
+  // Handle assignment submission
+  const handleAssignmentSubmit = async (assignmentId) => {
+    if (!user || !submissionText) return;
+    
+    try {
+      const { data, error } = await submitHomework({
+        homework_id: assignmentId,
+        student_id: user.id,
+        submission_text: submissionText,
+        submitted_at: new Date().toISOString()
+      });
+
+      if (error) throw error;
+
+      // Refresh assignments list
+      const { data: updatedAssignments } = await getStudentAssignments(user.id);
+      setAssignments(updatedAssignments || []);
+      setShowSubmissionForm(false);
+      setSelectedAssignment(null);
+      setSubmissionText('');
+    } catch (error) {
+      console.error('Error submitting assignment:', error);
+      setAssignmentsError('Failed to submit assignment');
+    }
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
   return (
-    <div className="bg-purple-100 min-h-screen">
+    <div className="flex min-h-screen bg-white">
+      {/* Sidebar - Desktop */}
+      <div className={`hidden lg:flex flex-col w-64 border-r border-gray-200 bg-white ${sidebarOpen ? 'block' : 'hidden'}`}>
+        <div className="flex items-center justify-center h-16 border-b border-gray-200">
+          <h1 className="text-xl font-semibold text-purple-600">Attendo</h1>
+        </div>
+        <div className="flex flex-col flex-grow p-4 overflow-auto">
+          <nav className="flex-1 space-y-2">
+            <Link 
+              to="/student" 
+              className="flex items-center px-4 py-3 text-sm font-medium rounded-lg bg-purple-50 text-purple-700"
+            >
+              <Home className="w-5 h-5 mr-3" />
+              Dashboard
+            </Link>
+            <Link 
+              to="/student/reports" 
+              className="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+            >
+              <FileText className="w-5 h-5 mr-3" />
+              Reports
+            </Link>
+            <Link 
+              to="/student/assignments" 
+              className="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+            >
+              <ClipboardList className="w-5 h-5 mr-3" />
+              Assignments
+            </Link>
+          </nav>
+          <div className="mt-auto pb-4">
+            <Link 
+              to="/student/profile" 
+              className="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+            >
+              <User className="w-5 h-5 mr-3" />
+              {profile?.first_name || 'Profile'}
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* Mobile Navigation */}
       <div className="lg:hidden bg-white shadow-sm sticky top-0 z-50">
         <div className="flex justify-between items-center p-4">
@@ -148,242 +386,415 @@ const StudentDashboard = () => {
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <div className="bg-white border-t p-4 animate-fadeIn">
-            <div className="grid grid-cols-3 gap-4">
-              <Link to="/student/calendar" className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-purple-50">
-                <Calendar size={20} className="text-purple-600 mb-1" />
-                <span className="text-xs">Calendar</span>
+            <div className="space-y-2">
+              <Link to="/student" className="flex items-center p-3 rounded-lg hover:bg-purple-50">
+                <Home size={20} className="text-purple-600 mr-3" />
+                <span>Dashboard</span>
               </Link>
-              <Link to="/student/stats" className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-purple-50">
-                <BarChart2 size={20} className="text-purple-600 mb-1" />
-                <span className="text-xs">Stats</span>
+              <Link to="/student/reports" className="flex items-center p-3 rounded-lg hover:bg-purple-50">
+                <FileText size={20} className="text-purple-600 mr-3" />
+                <span>Reports</span>
               </Link>
-              <Link to="/student/profile" className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-purple-50">
-                <User size={20} className="text-purple-600 mb-1" />
-                <span className="text-xs">Profile</span>
+              <Link to="/student/assignments" className="flex items-center p-3 rounded-lg hover:bg-purple-50">
+                <ClipboardList size={20} className="text-purple-600 mr-3" />
+                <span>Assignments</span>
+              </Link>
+              <Link to="/student/profile" className="flex items-center p-3 rounded-lg hover:bg-purple-50">
+                <User size={20} className="text-purple-600 mr-3" />
+                <span>Profile</span>
               </Link>
             </div>
           </div>
         )}
       </div>
       
-      <div className="container mx-auto px-4 py-6">
-        {/* Main Content */}
-        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
-          {/* Left Column - Dashboard and Stats */}
-          <div className="w-full lg:w-2/3 space-y-4 lg:space-y-6">
-            {/* Welcome Header */}
-            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border-l-4 border-purple-500">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold">Hi, {profile?.first_name || 'Student'}!!</h1>
-                  <p className="text-gray-600 text-sm sm:text-base">Manage your education with Attendo</p>
-                </div>
-                <Link 
-                  to="/student/reports"
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-2 px-4 sm:px-6 rounded-full flex items-center justify-center space-x-2 text-sm sm:text-base"
-                >
-                  <FileText size={16} />
-                  <span>Create Reports</span>
-                </Link>
+      <div className="flex-1 overflow-auto">
+        <div className="container mx-auto px-4 py-6">
+          {/* Main Content */}
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Left Column - Dashboard and Stats */}
+            <div className="w-full lg:w-2/3 space-y-6">
+              {/* Greeting Header */}
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">{greeting}, {profile?.first_name || 'Student'}!</h1>
+                <p className="text-gray-600">Here's your dashboard overview</p>
               </div>
-            </div>
 
-            {/* Stats Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-              {/* Attendance Chart */}
-              <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center space-x-2">
-                    <BarChart2 size={18} className="text-purple-600" />
-                    <h2 className="font-semibold text-sm sm:text-base">Attendance Metrics</h2>
+              {/* Quick Actions */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Link 
+                  to="/student/reports/create" 
+                  className="bg-purple-50 hover:bg-purple-100 p-4 rounded-xl transition-colors"
+                >
+                  <div className="flex items-center">
+                    <div className="p-3 rounded-lg bg-purple-100 text-purple-600 mr-4">
+                      <FileText size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Create Reports</h3>
+                      <p className="text-sm text-gray-500">Generate your attendance reports</p>
+                    </div>
                   </div>
-                  <div className="text-xs sm:text-sm bg-gray-100 px-2 sm:px-3 py-1 rounded-full text-gray-600">{dateRange.start} - {dateRange.end}</div>
+                </Link>
+                
+                <Link 
+                  to="/student/attendance-records" 
+                  className="bg-purple-50 hover:bg-purple-100 p-4 rounded-xl transition-colors"
+                >
+                  <div className="flex items-center">
+                    <div className="p-3 rounded-lg bg-purple-100 text-purple-600 mr-4">
+                      <Clock size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Attendance Records</h3>
+                      <p className="text-sm text-gray-500">View your attendance history</p>
+                    </div>
+                  </div>
+                </Link>
+
+                <button 
+                  onClick={toggleQRScanner}
+                  className="bg-purple-50 hover:bg-purple-100 p-4 rounded-xl transition-colors text-left"
+                >
+                  <div className="flex items-center">
+                    <div className="p-3 rounded-lg bg-purple-100 text-purple-600 mr-4">
+                      <QrCode size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Mark Attendance</h3>
+                      <p className="text-sm text-gray-500">Scan QR code to mark presence</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Stats Section */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="font-semibold text-lg">Attendance Metrics</h2>
+                  <button className="text-purple-600 hover:text-purple-800 text-sm flex items-center">
+                    <Download size={16} className="mr-1" />
+                    Export
+                  </button>
                 </div>
                 
                 {/* Bar Chart Visualization */}
-                <div className="h-32 sm:h-40 flex items-end justify-between space-x-1 sm:space-x-2 mb-4 sm:mb-6">
-                  {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'].map((month, index) => {
-                    const height = 20 + Math.random() * 60;
-                    return (
-                      <div key={month} className="flex flex-col items-center">
-                        <div 
-                          style={{height: `${height}%`}} 
-                          className={`w-4 sm:w-6 rounded-t-md ${index === 6 ? 'bg-gradient-to-t from-blue-500 to-purple-500' : 'bg-gray-200'}`}>
-                        </div>
-                        <span className="text-xs mt-1 sm:mt-2 text-gray-500">{month}</span>
-                      </div>
-                    );
-                  })}
+                <div className="h-64 mb-6">
+                  {attendanceRecords.length > 0 ? (
+                    <Bar data={chartData} options={chartOptions} />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      No attendance data available for chart
+                    </div>
+                  )}
                 </div>
                 
                 {/* Stats Summary */}
-                {attendanceRecords.length > 0 && (
-                  <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white p-3 sm:p-4 rounded-lg shadow-lg max-w-xs relative mb-4 sm:mb-6">
-                    <div className="absolute bottom-full left-1/4 w-3 h-3 sm:w-4 sm:h-4 transform rotate-45 bg-gray-900"></div>
-                    <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
-                      <li className="flex items-center">
-                        <span className="w-2 h-2 sm:w-3 sm:h-3 bg-blue-500 rounded-full mr-2"></span>
-                        <span>Class Hours: 42hr</span>
-                      </li>
-                      <li className="flex items-center">
-                        <span className="w-2 h-2 sm:w-3 sm:h-3 bg-purple-500 rounded-full mr-2"></span>
-                        <span>Attendance Rate: {stats.present}%</span>
-                      </li>
-                      <li className="flex items-center">
-                        <span className="w-2 h-2 sm:w-3 sm:h-3 bg-orange-500 rounded-full mr-2"></span>
-                        <span>Punctuality: {100 - stats.late}%</span>
-                      </li>
-                    </ul>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-500">Present</p>
+                    <p className="text-2xl font-bold text-purple-600">{stats.present}%</p>
+                  </div>
+                  <div className="bg-yellow-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-500">Late</p>
+                    <p className="text-2xl font-bold text-yellow-600">{stats.late}%</p>
+                  </div>
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-500">Absent</p>
+                    <p className="text-2xl font-bold text-red-600">{stats.absent}%</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Attendance Records Table */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="font-semibold text-lg">Recent Attendance</h2>
+                  <Link 
+                    to="/student/attendance-records"
+                    className="text-purple-600 hover:text-purple-800 text-sm"
+                  >
+                    View All
+                  </Link>
+                </div>
+                
+                {isLoading ? (
+                  <div className="flex justify-center items-center h-40">
+                    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500"></div>
+                  </div>
+                ) : error ? (
+                  <div className="bg-red-50 border-l-4 border-red-400 p-4 text-sm text-red-700">
+                    {error}
+                  </div>
+                ) : attendanceRecords.length === 0 ? (
+                  <div className="bg-gray-50 rounded-lg p-8 text-center">
+                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Calendar size={24} className="text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No attendance records yet</h3>
+                    <p className="text-sm text-gray-600">
+                      Your attendance history will appear here after you mark your first attendance.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                      <thead>
+                        <tr className="text-left text-gray-500 text-sm">
+                          <th className="pb-3">Date</th>
+                          <th className="pb-3">Status</th>
+                          <th className="pb-3">Time In</th>
+                          <th className="pb-3">Time Out</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {attendanceRecords.slice(0, 5).map((record, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="py-3 text-sm">
+                              {new Date(record.date).toLocaleDateString()}
+                            </td>
+                            <td className="py-3">
+                              <span className={`inline-block px-2 py-1 rounded-full text-xs ${
+                                record.is_late 
+                                  ? 'bg-yellow-100 text-yellow-800' 
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {record.is_late ? 'Late' : 'On Time'}
+                              </span>
+                            </td>
+                            <td className="py-3 text-sm">
+                              {record.time_in}
+                            </td>
+                            <td className="py-3 text-sm">
+                              {record.time_out || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="w-full lg:w-1/3 space-y-6">
+              {/* Calendar */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-medium">{currentMonth} {currentYear}</h3>
+                  <Link to="/student/calendar" className="text-purple-600 hover:text-purple-800 text-sm">
+                    View All
+                  </Link>
+                </div>
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
+                    <div key={day} className="text-xs text-gray-500 py-1">{day}</div>
+                  ))}
+                  {days.map((day, index) => (
+                    <div 
+                      key={index} 
+                      className={`text-xs p-2 rounded-full ${day === today ? 'bg-purple-100 text-purple-800 font-medium' : 'text-gray-700'} ${day ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+                    >
+                      {day || ''}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Todo List */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-medium">My Tasks</h3>
+                  <Link to="/student/tasks" className="text-purple-600 hover:text-purple-800 text-sm">
+                    View All
+                  </Link>
+                </div>
+                <div className="space-y-3 mb-4">
+                  {todos.slice(0, 4).map(todo => (
+                    <div key={todo.id} className="flex items-center">
+                      <button 
+                        onClick={() => toggleTodo(todo.id)}
+                        className={`w-5 h-5 rounded mr-3 flex items-center justify-center ${todo.completed ? 'bg-purple-500 text-white' : 'border border-gray-300'}`}
+                      >
+                        {todo.completed && <Check size={14} />}
+                      </button>
+                      <span className={`text-sm flex-grow ${todo.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                        {todo.text}
+                      </span>
+                      <button 
+                        onClick={() => deleteTodo(todo.id)}
+                        className="text-gray-400 hover:text-red-500 ml-2"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex">
+                  <input
+                    type="text"
+                    value={newTodo}
+                    onChange={(e) => setNewTodo(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addTodo()}
+                    placeholder="Add a new task..."
+                    className="flex-grow text-sm border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                  />
+                  <button
+                    onClick={addTodo}
+                    className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-r-lg"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Assignments Section */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="font-semibold text-lg">Your Assignments</h2>
+                  <Link 
+                    to="/student/assignments"
+                    className="text-purple-600 hover:text-purple-800 text-sm"
+                  >
+                    View All
+                  </Link>
+                </div>
+                
+                {assignmentsLoading ? (
+                  <div className="flex justify-center items-center h-40">
+                    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500"></div>
+                  </div>
+                ) : assignmentsError ? (
+                  <div className="bg-red-50 border-l-4 border-red-400 p-4 text-sm text-red-700">
+                    {assignmentsError}
+                  </div>
+                ) : assignments.length === 0 ? (
+                  <div className="bg-gray-50 rounded-lg p-8 text-center">
+                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <ClipboardList size={24} className="text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No assignments yet</h3>
+                    <p className="text-sm text-gray-600">
+                      Your assignments will appear here when your teachers post them.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {assignments.slice(0, 3).map(assignment => (
+                      <div key={assignment.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-medium text-gray-900">{assignment.title}</h3>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            new Date(assignment.due_date) < new Date() 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            Due: {formatDate(assignment.due_date)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                          {assignment.description}
+                        </p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-500">
+                            {assignment.courses?.name}
+                          </span>
+                          <button 
+                            onClick={() => {
+                              setSelectedAssignment(assignment);
+                              setShowSubmissionForm(true);
+                            }}
+                            className="text-purple-600 hover:text-purple-800 text-sm flex items-center"
+                          >
+                            Submit
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
 
-              {/* Quick Links */}
-              <div className="space-y-3">
-                <Link 
-                  to="/student/attendance-records" 
-                  className="w-full text-left px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors flex items-center text-sm"
-                >
-                  <Calendar size={16} className="mr-3 text-purple-500" />
-                  View Attendance Records
-                </Link>
-                
-                <Link 
-                  to="/student/transcript" 
-                  className="w-full text-left px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors flex items-center text-sm"
-                >
-                  <FileText size={16} className="mr-3 text-purple-500" />
-                  Download Transcript
-                </Link>
-                
-                <Link 
-                  to="/student/profile" 
-                  className="w-full text-left px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors flex items-center text-sm"
-                >
-                  <User size={16} className="mr-3 text-purple-500" />
-                  Update Profile
-                </Link>
-              </div>
-            </div>
-
-            {/* Attendance Records Table */}
-            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
-                <div className="flex items-center space-x-2">
-                  <Calendar size={18} className="text-purple-600" />
-                  <h2 className="font-semibold text-sm sm:text-base">Attendance Records</h2>
-                </div>
-                <div className="flex flex-wrap gap-2 sm:space-x-2">
-                  <button className="text-gray-500 hover:text-gray-700 p-1 bg-gray-100 rounded-md">
-                    <Search size={16} />
-                  </button>
-                  <button className="text-gray-500 hover:text-gray-700 p-1 bg-gray-100 rounded-md">
-                    <Settings size={16} />
-                  </button>
-                  <button className="text-gray-500 hover:bg-gray-100 px-2 sm:px-3 py-1 border rounded-md flex items-center space-x-1 transition-colors text-xs sm:text-sm">
-                    <Download size={14} />
-                    <span>Export</span>
-                  </button>
-                  <Link 
-                    to="/student/reports"
-                    className="text-purple-600 hover:bg-purple-50 px-2 sm:px-3 py-1 border border-purple-200 rounded-md flex items-center space-x-1 transition-colors text-xs sm:text-sm"
-                  >
-                    <FileText size={14} />
-                    <span>View report</span>
-                  </Link>
-                </div>
-              </div>
-              
-              {/* Attendance Records Content */}
-              {isLoading ? (
-                <div className="flex justify-center items-center h-40">
-                  <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-purple-500"></div>
-                </div>
-              ) : error ? (
-                <div className="bg-red-50 border-l-4 border-red-400 p-3 sm:p-4 text-xs sm:text-sm text-red-700">
-                  {error}
-                </div>
-              ) : attendanceRecords.length === 0 ? (
-                <div className="bg-gray-50 rounded-lg p-4 sm:p-8 text-center">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                    <Calendar size={24} className="text-gray-400" />
+              {/* Assignment Submission Modal */}
+              {showSubmissionForm && selectedAssignment && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-medium">Submit Assignment: {selectedAssignment.title}</h3>
+                      <button 
+                        onClick={() => {
+                          setShowSubmissionForm(false);
+                          setSelectedAssignment(null);
+                        }} 
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        <X size={24} />
+                      </button>
+                    </div>
+                    <div className="mb-4">
+                      <label htmlFor="submissionText" className="block text-sm font-medium text-gray-700 mb-1">
+                        Your Submission
+                      </label>
+                      <textarea
+                        id="submissionText"
+                        value={submissionText}
+                        onChange={(e) => setSubmissionText(e.target.value)}
+                        rows={6}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                        placeholder="Write your submission here..."
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        onClick={() => {
+                          setShowSubmissionForm(false);
+                          setSelectedAssignment(null);
+                        }}
+                        className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleAssignmentSubmit(selectedAssignment.id)}
+                        className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
+                      >
+                        Submit Assignment
+                      </button>
+                    </div>
                   </div>
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">No attendance records yet</h3>
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    Your attendance history will appear here after you mark your first attendance.
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead>
-                      <tr className="text-left text-gray-500 text-xs sm:text-sm">
-                        <th className="py-2 sm:py-3 px-4 sm:px-6">Date</th>
-                        <th className="py-2 sm:py-3 px-4 sm:px-6">Status</th>
-                        <th className="py-2 sm:py-3 px-4 sm:px-6">Time In</th>
-                        <th className="py-2 sm:py-3 px-4 sm:px-6">Time Out</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {attendanceRecords.map((record, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="py-2 sm:py-3 px-4 sm:px-6 text-sm">
-                            {new Date(record.date).toLocaleDateString()}
-                          </td>
-                          <td className="py-2 sm:py-3 px-4 sm:px-6">
-                            <span className={`inline-block px-2 py-1 rounded-full text-xs ${
-                              record.is_late 
-                                ? 'bg-yellow-100 text-yellow-800' 
-                                : 'bg-green-100 text-green-800'
-                            }`}>
-                              {record.is_late ? 'Late' : 'On Time'}
-                            </span>
-                          </td>
-                          <td className="py-2 sm:py-3 px-4 sm:px-6 text-sm">
-                            {record.time_in}
-                          </td>
-                          <td className="py-2 sm:py-3 px-4 sm:px-6 text-sm">
-                            {record.time_out || '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Right Column */}
-          <div className="w-full lg:w-1/3 space-y-4 lg:space-y-6">
-            {/* Mark Attendance Tool */}
-            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <User size={18} className="text-purple-600" />
-                  <h2 className="font-semibold text-sm sm:text-base">Mark Attendance</h2>
+              {/* Mark Attendance Tool */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-semibold">Mark Attendance</h2>
+                  <button 
+                    onClick={toggleQRScanner}
+                    className="bg-purple-100 hover:bg-purple-200 text-purple-700 p-2 rounded-full"
+                  >
+                    <QrCode size={18} />
+                  </button>
                 </div>
-                <button 
-                  onClick={toggleQRScanner}
-                  className="bg-purple-100 hover:bg-purple-200 text-purple-700 p-2 rounded-full"
-                >
-                  <QrCode size={18} />
-                </button>
+                
+                {showQRScanner ? (
+                  <QRScanner onScan={handleQRScan} />
+                ) : (
+                  <AttendanceForm onAttendanceMarked={handleAttendanceMarked} />
+                )}
               </div>
               
-              {showQRScanner ? (
-                <QRScanner onScan={handleQRScan} />
-              ) : (
-                <AttendanceForm onAttendanceMarked={handleAttendanceMarked} />
-              )}
-            </div>
-            
-            {/* Blockchain Attendance */}
-            <BlockchainAttendance />
-            
-            {/* Wallet Section */}
-            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-100">
-              <WalletConnect />
+              {/* Blockchain Attendance */}
+              <BlockchainAttendance />
+              
+              {/* Wallet Section */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <WalletConnect />
+              </div>
             </div>
           </div>
         </div>
@@ -395,6 +806,21 @@ const StudentDashboard = () => {
           <User size={24} />
         </button>
       </div>
+      
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Scan QR Code</h3>
+              <button onClick={toggleQRScanner} className="text-gray-500 hover:text-gray-700">
+                <X size={24} />
+              </button>
+            </div>
+            <QRScanner onScan={handleQRScan} />
+          </div>
+        </div>
+      )}
       
       {/* Animations */}
       <style jsx>{`
