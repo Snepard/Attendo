@@ -26,7 +26,7 @@ const BlockchainAttendance = () => {
         setAttendanceData(status);
       } catch (error) {
         console.error('Error fetching blockchain attendance:', error);
-        setError('Failed to fetch blockchain attendance data');
+        // setError('Failed to fetch blockchain attendance data');
       } finally {
         setIsLoading(false);
       }

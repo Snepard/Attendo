@@ -327,9 +327,6 @@ const StudentDashboard = () => {
     <div className="flex min-h-screen bg-white">
       {/* Sidebar - Desktop */}
       <div className={`hidden lg:flex flex-col w-64 border-r border-gray-200 bg-white ${sidebarOpen ? 'block' : 'hidden'}`}>
-        <div className="flex items-center justify-center h-16 border-b border-gray-200">
-          <h1 className="text-xl font-semibold text-purple-600">Attendo</h1>
-        </div>
         <div className="flex flex-col flex-grow p-4 overflow-auto">
           <nav className="flex-1 space-y-2">
             <Link 
