@@ -11,6 +11,7 @@ import StudentProfile from './pages/student/StudentProfile';
 import AttendanceRecords from './pages/student/AttendanceRecords';
 import Transcript from './pages/student/Transcript';
 import Reports from './pages/student/Reports';
+import Classes from './pages/student/classes'; // Add this import
 
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherStudentList from './pages/teacher/TeacherStudentList';
@@ -40,6 +41,7 @@ function AppContent() {
             <Route path="/student/attendance-records" element={<AttendanceRecords />} />
             <Route path="/student/transcript" element={<Transcript />} />
             <Route path="/student/reports" element={<Reports />} />
+            <Route path="/student/classes" element={<Classes />} /> {/* Add this line */}
           </Route>
           
           {/* Teacher routes */}
