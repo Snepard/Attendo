@@ -18,8 +18,8 @@ const deg2rad = (deg) => {
 
 // Campus coordinates
 export const CAMPUS_COORDINATES = {
-  latitude: 30.496051,
-  longitude: 76.600345,
+  latitude: 30.5151426,
+  longitude: 76.6597119,
   radius: 2.0 // 2 kilometers radius
 };
 
