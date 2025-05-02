@@ -11,6 +11,7 @@ import StudentProfile from './pages/student/StudentProfile';
 import AttendanceRecords from './pages/student/AttendanceRecords';
 import Transcript from './pages/student/Transcript';
 import Reports from './pages/student/Reports';
+import Classes from './pages/student/Classes'; // Add this import
 
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherStudentList from './pages/teacher/TeacherStudentList';
