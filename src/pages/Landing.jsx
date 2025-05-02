@@ -19,8 +19,7 @@ const Landing = () => {
         <div className="container mx-auto px-6 py-12">
           <nav className="flex justify-between items-center mb-12">
             <div className="text-2xl font-black flex items-center tracking-tight">
-              <span className="mr-2 text-3xl transform rotate-12 inline-block">⏱</span> 
-              <span className="bg-white px-2 py-1 rounded-lg">atte<span className="text-purple-500">ndo</span></span>
+              <span className="bg-white px-2 py-1 bg-opacity-70 rounded-lg mx-3"><img src="/logo.png" alt="Attendo Logo" className="h-11" /></span>
             </div>
             <div className="flex space-x-3">
               {user ? (
